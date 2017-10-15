@@ -98,7 +98,7 @@ app.post('/dummySelect', function (req, res) {
 app.post('/dummyInsert', function (req, res) {
     var retVal = {};
     var status_var;
-    if (req.body.name && req.body.email && req.body.phoneno && req.body.password && req.body.secret=="") {
+    if (req.body.name && req.body.email && req.body.phoneno && req.body.password && req.body.secret) {
 
         var query = "INSERT INTO users(email,name,phoneno,password) VALUES('" + req.body.email + "','" + req.body.name + "','" + req.body.phoneno + "','" + req.body.password + "');";
 

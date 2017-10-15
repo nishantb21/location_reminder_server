@@ -53,19 +53,75 @@ app.use('/users', users);
 // catch 404 and forward to error handler
 
 
-app.post('/register', function (req, res) {
+app.post('/dummySelect', function (req, res) {
     var retVal = {};
-    if (req.body.name && req.body.email && req.body.phoneno && req.body.password) {
-        retVal = {
-            status: "Success"
-        }
+    var status_var;
+    var result_list = [];
+    if (req.body.name && req.body.email && req.body.phoneno && req.body.password && req.body.secret) {
+
+        /*var query = "INSERT INTO users(email,name,phone,password) VALUES('" + req.body.email + "','" + req.body.name + "','" + req.body.phoneno + "','" + req.body.password + "');";
+        console.log(query);*/
+        var query = 'SELECT * FROM users;';
+
+        var request = new Request(query, function (err, rowCount, rows) {
+            if (err) {
+                status_var = false;
+                console.log(err);
+            }
+            else {
+                status_var = true;
+                console.log(result_list);
+                retVal["rows"] = result_list;
+            }
+            retVal["status"] = status_var;
+            res.send(retVal);
+        });
+
+        request.on('row', function (columns) {
+            var user = {};
+            columns.forEach(function (column) {
+                user[column.metadata.colName] = column.value;
+            });
+            result_list.push(user);
+        });
+        connection.execSql(request);
     }
     else {
+        status_var = false;
         retVal = {
-            status: "Failure"
+            status: status_var
         }
+        res.send(retVal);
     }
-    res.send(retVal);
+});
+
+app.post('/dummyInsert', function (req, res) {
+    var retVal = {};
+    var status_var;
+    if (req.body.name && req.body.email && req.body.phoneno && req.body.password && req.body.secret=="") {
+
+        var query = "INSERT INTO users(email,name,phoneno,password) VALUES('" + req.body.email + "','" + req.body.name + "','" + req.body.phoneno + "','" + req.body.password + "');";
+
+        var request = new Request(query, function (err, rowCount, rows) {
+            if (err) {
+                status_var = false;
+                console.log(err);
+            }
+            else {
+                status_var = true;
+            }
+            retVal["status"] = status_var;
+            res.send(retVal);
+        });
+        connection.execSql(request);
+    }
+    else {
+        status_var = false;
+        retVal = {
+            status: status_var
+        }
+        res.send(retVal);
+    }
 });
 // error handlers
 /*
