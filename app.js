@@ -13,10 +13,18 @@ var users = require('./routes/users');
 var Connection = require('tedious').Connection;
 var Request = require('tedious').Request;
 
+var crypto = require('crypto');
+
 var app = express();
 
+<<<<<<< HEAD
 //Bhatta's config info
 /*var config = {
+=======
+var tokens = [];
+
+var config = {
+>>>>>>> 45725bb6b578faf540d86b426918fc8c6fccbb51
     userName: 'manager',
     password: 'Root1234',
     server: 'delilah.database.windows.net',
@@ -64,7 +72,7 @@ app.use('/', routes);
 app.use('/users', users);
 
 // catch 404 and forward to error handler
-
+var secret = "fb943a2432995dc8114f15f868bbec305fac35b82e610286a2155e807cb577d4";
 
 app.post('/dummySelect', function (req, res) {
     var retVal = {};
@@ -136,6 +144,47 @@ app.post('/dummyInsert', function (req, res) {
         res.send(retVal);
     }
 });
+app.post('/signup', function (req, res) {
+    var retVal = {};
+    var status_var;
+    // Accepts the Name, Email, Phone Number and Password along with Secret
+    if (req.body.name && req.body.password && req.body.phoneno && req.body.email && req.body.secret) {
+        // Parameters are fine
+        
+        if (req.body.secret == secret) {
+            // Authorized for further operations, insert the user into the database
+            // Hash the password before inserting into the database
+            var hashed_password = crypto.createHmac('sha256', secret).update(req.body.password).digest('hex');
+
+            var query = "INSERT INTO users(email,name,phoneno,password) VALUES('" + req.body.email + "','" + req.body.name + "','" + req.body.phoneno + "','" + hashed_password + "');";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {1
+                    status_var = false;
+                    retVal["error"] = err.message;
+                }
+                else {
+                    status_var = true;
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+            connection.execSql(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = false;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = false;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
 // error handlers
 /*
 // development error handler
@@ -160,7 +209,7 @@ app.use(function (err, req, res, next) {
     });
 });
 */
-app.set('port', process.env.PORT || 3030);
+app.set('port', process.env.PORT || 3000);
 
 var server = app.listen(app.get('port'), function () {
     console.log("Server is up and running...");
