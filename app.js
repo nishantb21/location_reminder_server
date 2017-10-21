@@ -15,7 +15,8 @@ var Request = require('tedious').Request;
 
 var app = express();
 
-var config = {
+//Bhatta's config info
+/*var config = {
     userName: 'manager',
     password: 'Root1234',
     server: 'delilah.database.windows.net',
@@ -23,7 +24,19 @@ var config = {
         database: 'test',
         encrypt: true
     }
+}*/
+
+//Monish's config info
+var config = {
+    userName: 'test_1',
+    password: 'hello123',
+    server: 'MONISH',
+    options: {
+        database: 'MYSERVER1',
+        database: 'test_a'
+    }
 }
+
 var connection = new Connection(config)
 
 connection.on('connect', function (err) {
