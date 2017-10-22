@@ -17,7 +17,7 @@ var crypto = require('crypto');
 
 var app = express();
 
-<<<<<<< HEAD
+
 //Bhatta's config info
 /*var config = {
 =======
@@ -144,22 +144,277 @@ app.post('/dummyInsert', function (req, res) {
         res.send(retVal);
     }
 });
+app.post('/markdone', function (req, res) {
+    var retVal = {};
+    var status_var;
+    // Accepts the item_id and list_id along with Secret
+    if (req.body.secret && req.body.list_id && req.body.item_id) {
+        // Parameters are fine
+        
+        if (req.body.secret == secret) {
+            // Authorized for further operations
+
+            var query = "UPDATE list_contents SET done = '1' WHERE list_id = '" + req.body.list_id + "' and item_id = '" + req.body.item_id + "';"
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                }
+                else {
+                    status_var = 200;
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+            connection.execSql(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
+
+app.post('/addcircles', function (req, res) {
+    var retVal = {};
+    var status_var;
+    var result_list = [];
+
+    //Accepts list_id, src_email, label along with the Secret
+    if (req.body.list_id && req.body.src_email && req.body.label && req.body.secret) {
+        //parameters are fine
+
+        if (req.body.secret == secret) {
+            //Authorized for further operations
+
+            var query = "SELECT dest_email from circles WHERE src_email = '" + req.body.src_email + "' and label = '" + req.body.label + "';";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    console.log(err);
+                }
+                else {
+                    status_var = 200;
+                    console.log("the list is " + result_list);
+                    var temoStr = "";
+                    for(var z = 0; z < result_list.length - 1; z++) {
+                       temoStr = temoStr + "('" + req.body.list_id + "','" + result_list[z] + "'), " 
+                    }
+                    temoStr = temoStr + "('" + req.body.list_id + "','" + result_list[z] + "')";
+
+                    var query1 = "INSERT INTO lists_share(list_id, email) VALUES" + temoStr + ";";
+
+                    var request1 = new Request(query1, function (err, rowCount, rows) {
+                        if (err) {
+                            console.log(err);
+                        }
+                    });
+                    connection.execSql(request1);
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+
+            request.on('row', function (columns) {
+
+                columns.forEach(function (column) {
+                    result_list.push(column.value);
+                });
+                //console.log(result_list);
+            });
+            connection.execSql(request);
+            console.log("hello");
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        //insufficient parameters
+        status_var = 400;
+        retVal = {
+            status: status_var
+        }
+        res.send(retVal);
+    }
+});
+
+app.post('/deletecircles', function (req, res) {
+    var retVal = {};
+    var status_var;
+    var result_list = [];
+
+    // Accepst list_id, src_email, label along with Secret
+    if (req.body.list_id && req.body.src_email && req.body.label && req.body.secret) {
+        //Parameters are fine
+
+        if (req.body.secret == secret) {
+            //Authorized for further operations
+
+            var query = "SELECT dest_email from circles WHERE src_email = '" + req.body.src_email + "' and label = '" + req.body.label + "';";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    console.log(err);
+                }
+                else {
+                    status_var = 200;
+                    console.log("the list is " + result_list);
+                    var temoStr = "";
+                    for (var z = 0; z < result_list.length - 1; z++) {
+                        temoStr = temoStr + "email = '" + result_list[z] + "' or  "
+                    }
+                    temoStr = temoStr + "email = '" + result_list[z] + "';";
+
+                    var query1 = "delete from lists_share where " + temoStr + ";";
+
+                    var request1 = new Request(query1, function (err, rowCount, rows) {
+                        if (err) {
+                            console.log(err);
+                        }
+                    });
+                    connection.execSql(request1);
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+
+            request.on('row', function (columns) {
+
+                columns.forEach(function (column) {
+                    result_list.push(column.value);
+                });
+                //console.log(result_list);
+            });
+            connection.execSql(request);
+            console.log("hello");
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        status_var = 400;
+        retVal = {
+            status: status_var
+        }
+        res.send(retVal);
+    }
+});
+
+app.post('/addlist', function (req, res) {
+    var retVal = {};
+    var status_var;
+    // Accepts the name of the list (title in DB) and email id of the owner (owner in DB) along with Secret
+    if (req.body.list_name &&  req.body.email && req.body.secret) {
+        // Parameters are fine
+
+        if (req.body.secret == secret) {
+            // Authorized for further operations, insert the user into the database
+            
+            var query = "INSERT INTO lists (owner,title) VALUES('" + req.body.email + "','" + req.body.list_name + "');";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                }
+                else {
+                    status_var = 200;
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+            connection.execSql(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
+
+app.post('/deletelist', function (req, res) {
+    var retVal = {};
+    var status_var;
+    // Accepts the name of the list (title in DB) and email id of the owner (owner in DB) along with Secret
+    if (req.body.list_name && req.body.email && req.body.secret) {
+        // Parameters are fine
+
+        if (req.body.secret == secret) {
+            // Authorized for further operations, insert the user into the database
+
+            var query = "DELETE from lists WHERE owner = '" + req.body.email + "' and title = '" + req.body.list_name + "' ;";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                }
+                else {
+                    status_var = 200;
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+            connection.execSql(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
+
 app.post('/signup', function (req, res) {
     var retVal = {};
     var status_var;
     // Accepts the Name, Email, Phone Number and Password along with Secret
     if (req.body.name && req.body.password && req.body.phoneno && req.body.email && req.body.secret) {
         // Parameters are fine
-        
+
         if (req.body.secret == secret) {
             // Authorized for further operations, insert the user into the database
-            // Hash the password before inserting into the database
             var hashed_password = crypto.createHmac('sha256', secret).update(req.body.password).digest('hex');
 
             var query = "INSERT INTO users(email,name,phoneno,password) VALUES('" + req.body.email + "','" + req.body.name + "','" + req.body.phoneno + "','" + hashed_password + "');";
 
             var request = new Request(query, function (err, rowCount, rows) {
-                if (err) {1
+                if (err) {
+                    
                     status_var = false;
                     retVal["error"] = err.message;
                 }
