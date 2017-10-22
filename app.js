@@ -57,76 +57,6 @@ app.use('/users', users);
 // catch 404 and forward to error handler
 var secret = "fb943a2432995dc8114f15f868bbec305fac35b82e610286a2155e807cb577d4";
 
-app.post('/dummySelect', function (req, res) {
-    var retVal = {};
-    var status_var;
-    var result_list = [];
-    if (req.body.name && req.body.email && req.body.phoneno && req.body.password && req.body.secret) {
-
-        /*var query = "INSERT INTO users(email,name,phone,password) VALUES('" + req.body.email + "','" + req.body.name + "','" + req.body.phoneno + "','" + req.body.password + "');";
-        console.log(query);*/
-        var query = 'SELECT * FROM users;';
-
-        var request = new Request(query, function (err, rowCount, rows) {
-            if (err) {
-                status_var = false;
-                console.log(err);
-            }
-            else {
-                status_var = true;
-                console.log(result_list);
-                retVal["rows"] = result_list;
-            }
-            retVal["status"] = status_var;
-            res.send(retVal);
-        });
-
-        request.on('row', function (columns) {
-            var user = {};
-            columns.forEach(function (column) {
-                user[column.metadata.colName] = column.value;
-            });
-            result_list.push(user);
-        });
-        connection.execSql(request);
-    }
-    else {
-        status_var = false;
-        retVal = {
-            status: status_var
-        }
-        res.send(retVal);
-    }
-});
-
-app.post('/dummyInsert', function (req, res) {
-    var retVal = {};
-    var status_var;
-    if (req.body.name && req.body.email && req.body.phoneno && req.body.password && req.body.secret) {
-
-        var query = "INSERT INTO users(email,name,phoneno,password) VALUES('" + req.body.email + "','" + req.body.name + "','" + req.body.phoneno + "','" + req.body.password + "');";
-
-        var request = new Request(query, function (err, rowCount, rows) {
-            if (err) {
-                status_var = false;
-                console.log(err);
-            }
-            else {
-                status_var = true;
-            }
-            retVal["status"] = status_var;
-            res.send(retVal);
-        });
-        connection.execSql(request);
-    }
-    else {
-        status_var = false;
-        retVal = {
-            status: status_var
-        }
-        res.send(retVal);
-    }
-});
 app.post('/signup', function (req, res) {
     var retVal = {};
     var status_var;
@@ -142,12 +72,12 @@ app.post('/signup', function (req, res) {
             var query = "INSERT INTO users(email,name,phoneno,password) VALUES('" + req.body.email + "','" + req.body.name + "','" + req.body.phoneno + "','" + hashed_password + "');";
 
             var request = new Request(query, function (err, rowCount, rows) {
-                if (err) {1
-                    status_var = false;
+                if (err) {
+                    status_var = 500;
                     retVal["error"] = err.message;
                 }
                 else {
-                    status_var = true;
+                    status_var = 200;
                 }
                 retVal["status"] = status_var;
                 res.send(retVal);
@@ -157,18 +87,271 @@ app.post('/signup', function (req, res) {
         else {
             // Unauthorized access
             retVal["error"] = "Unauthorized Access";
-            retVal["status"] = false;
+            retVal["status"] = 405;
             res.send(retVal);
         }
     }
     else {
         // Not enough parameters passed
-        retVal["status"] = false;
+        retVal["status"] = 400;
         retVal["error"] = "Not enough parameters passed";
         res.send(retVal);
     }
 });
-// error handlers
+
+app.post('/login', function (req, res) {
+    //Accepts email, password and secret
+    var retVal = {};
+    var status_var;
+    var flag = false;
+    if (req.body.password && req.body.email && req.body.secret) {
+        // Parameters are fine
+
+        if (req.body.secret == secret) {
+            // Authorized for login
+            // Hash the incoming password
+            var hashed_password = crypto.createHmac('sha256', secret).update(req.body.password).digest('hex');
+
+            var query = "SELECT * FROM users WHERE email = '" + req.body.email + "' AND password = '" + hashed_password + "';";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                }
+                else {
+                    //status_var = 200;
+                    if (flag == true) {
+                        status_var = 200;
+                    }
+                    else {
+                        status_var = 404;
+                        retVal["error"] = "Either username or password is incorrect."
+                    }
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+
+            request.on('row', function (columns) {
+                flag = true;
+            });
+            connection.execSql(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+    
+});
+
+app.post('/getalllists', function (req, res) {
+    //Accepts email and secret
+    var retVal = {};
+    var result_list = [];
+    var status_var;
+    var flag = false;
+    if (req.body.email && req.body.secret) {
+        // Parameters are fine
+        if (req.body.secret == secret) {
+            // Authorized for operation
+            var query = "SELECT * FROM lists WHERE owner = '" + req.body.email + "';";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                }
+                else {
+                    //status_var = 200;
+                    if (flag == true) {
+                        status_var = 200;
+                        retVal["rows"] = result_list;
+                    }
+                    else {
+                        status_var = 404;
+                        retVal["error"] = "No lists found."
+                    }
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+
+            request.on('row', function (columns) {
+                flag = true;
+                var user = {};
+                columns.forEach(function (column) {
+                    user[column.metadata.colName] = column.value;
+                });
+                result_list.push(user);
+            });
+            connection.execSql(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
+
+app.post('/getlistcontents', function (req, res) {
+    //Accepts a list_id and secret
+    var retVal = {};
+    var result_list = [];
+    var status_var;
+    var flag = false;
+    if (req.body.list_id && req.body.secret) {
+        // Parameters are fine
+        if (req.body.secret == secret) {
+            // Authorized for operation
+            var query = "SELECT * FROM list_contents WHERE list_id = '" + req.body.list_id + "';";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                }
+                else {
+                    //status_var = 200;
+                    if (flag == true) {
+                        status_var = 200;
+                        retVal["rows"] = result_list;
+                    }
+                    else {
+                        status_var = 404;
+                        retVal["error"] = "No list items found."
+                    }
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+
+            request.on('row', function (columns) {
+                flag = true;
+                var user = {};
+                columns.forEach(function (column) {
+                    user[column.metadata.colName] = column.value;
+                });
+                result_list.push(user);
+            });
+            connection.execSql(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
+
+app.post('/additem', function (req, res) {
+    var retVal = {};
+    var status_var;
+    // Accepts list_id, email, item_name, location_name, latitude, longitude and secret
+    if (req.body.list_id && req.body.item_name && req.body.secret && req.body.email) {
+        // Parameters are fine
+        if (req.body.secret == secret) {
+            // Authorized for further operations
+            var query;
+            if (req.body.location_name && req.body.longitude && req.body.latitude) {
+                // Location stuff was specified
+                query = "INSERT INTO list_contents(list_id, email, item_name, location_name, longitude, latitude,done) VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name + "','" + req.body.location_name + "'," + req.body.longitude + "," + req.body.latitude + ",0);";
+            }
+            else {
+                // Location stuff was not specified
+                query = "INSERT INTO list_contents(list_id, email, item_name,done) VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name + "',0);";
+            }
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                }
+                else {
+                    status_var = 200;
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+            connection.execSql(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
+
+app.post('/deleteitem', function (req, res) {
+    var retVal = {};
+    var status_var;
+    // Accepts list_id, item_id and secret
+    if (req.body.list_id && req.body.item_id && req.body.secret) {
+        // Parameters are fine
+        if (req.body.secret == secret) {
+            // Authorized for further operations
+            var query = "DELETE FROM list_contents WHERE list_id = " + req.body.list_id + " AND item_id = " + req.body.item_id + ";";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                }
+                else {
+                    status_var = 200;
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+            connection.execSql(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
+{// error handlers
 /*
 // development error handler
 // will print stacktrace
@@ -191,7 +374,7 @@ app.use(function (err, req, res, next) {
         error: {}
     });
 });
-*/
+*/}
 app.set('port', process.env.PORT || 3000);
 
 var server = app.listen(app.get('port'), function () {
