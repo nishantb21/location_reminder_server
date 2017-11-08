@@ -74,76 +74,7 @@ app.use('/users', users);
 // catch 404 and forward to error handler
 var secret = "fb943a2432995dc8114f15f868bbec305fac35b82e610286a2155e807cb577d4";
 
-app.post('/dummySelect', function (req, res) {
-    var retVal = {};
-    var status_var;
-    var result_list = [];
-    if (req.body.name && req.body.email && req.body.phoneno && req.body.password && req.body.secret) {
 
-        /*var query = "INSERT INTO users(email,name,phone,password) VALUES('" + req.body.email + "','" + req.body.name + "','" + req.body.phoneno + "','" + req.body.password + "');";
-        console.log(query);*/
-        var query = 'SELECT * FROM users;';
-
-        var request = new Request(query, function (err, rowCount, rows) {
-            if (err) {
-                status_var = false;
-                console.log(err);
-            }
-            else {
-                status_var = true;
-                console.log(result_list);
-                retVal["rows"] = result_list;
-            }
-            retVal["status"] = status_var;
-            res.send(retVal);
-        });
-
-        request.on('row', function (columns) {
-            var user = {};
-            columns.forEach(function (column) {
-                user[column.metadata.colName] = column.value;
-            });
-            result_list.push(user);
-        });
-        connection.execSql(request);
-    }
-    else {
-        status_var = false;
-        retVal = {
-            status: status_var
-        }
-        res.send(retVal);
-    }
-});
-
-app.post('/dummyInsert', function (req, res) {
-    var retVal = {};
-    var status_var;
-    if (req.body.name && req.body.email && req.body.phoneno && req.body.password && req.body.secret) {
-
-        var query = "INSERT INTO users(email,name,phoneno,password) VALUES('" + req.body.email + "','" + req.body.name + "','" + req.body.phoneno + "','" + req.body.password + "');";
-
-        var request = new Request(query, function (err, rowCount, rows) {
-            if (err) {
-                status_var = false;
-                console.log(err);
-            }
-            else {
-                status_var = true;
-            }
-            retVal["status"] = status_var;
-            res.send(retVal);
-        });
-        connection.execSql(request);
-    }
-    else {
-        status_var = false;
-        retVal = {
-            status: status_var
-        }
-        res.send(retVal);
-    }
-});
 app.post('/markdone', function (req, res) {
     var retVal = {};
     var status_var;
@@ -184,7 +115,7 @@ app.post('/markdone', function (req, res) {
     }
 });
 
-app.post('/addcircles', function (req, res) {
+app.post('/share', function (req, res) {
     var retVal = {};
     var status_var;
     var result_list = [];
@@ -252,7 +183,7 @@ app.post('/addcircles', function (req, res) {
     }
 });
 
-app.post('/deletecircles', function (req, res) {
+app.post('/unshare', function (req, res) {
     var retVal = {};
     var status_var;
     var result_list = [];
@@ -338,9 +269,28 @@ app.post('/addlist', function (req, res) {
                 }
                 else {
                     status_var = 200;
+
+                    var query1 = "select list_id from lists where owner = '" + req.body.email + "' and title = '" + req.body.list_name + "';";
+                    var request1 = new Request(query1, function (err, rowCount, rows) {
+                        if (err) {
+                            console.log(err);
+                        }
+                    });
+
+                    request1.on('row', function (columns) {
+                        
+                        columns.forEach(function (column) {
+                            retVal[column.metadata.colName] = column.value;
+                        });
+                        res.send(retVal);
+                    });
+
+
+                    connection.execSql(request1);
+
                 }
                 retVal["status"] = status_var;
-                res.send(retVal);
+                
             });
             connection.execSql(request);
         }
@@ -362,14 +312,14 @@ app.post('/addlist', function (req, res) {
 app.post('/deletelist', function (req, res) {
     var retVal = {};
     var status_var;
-    // Accepts the name of the list (title in DB) and email id of the owner (owner in DB) along with Secret
-    if (req.body.list_name && req.body.email && req.body.secret) {
+    // Accepts the id of the list (title in DB) and email id of the owner (owner in DB) along with Secret
+    if (req.body.list_id && req.body.email && req.body.secret) {
         // Parameters are fine
 
         if (req.body.secret == secret) {
             // Authorized for further operations, insert the user into the database
 
-            var query = "DELETE from lists WHERE owner = '" + req.body.email + "' and title = '" + req.body.list_name + "' ;";
+            var query = "DELETE from lists WHERE owner = '" + req.body.email + "' and list_id = '" + req.body.list_id + "' ;";
 
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
@@ -399,47 +349,6 @@ app.post('/deletelist', function (req, res) {
     }
 });
 
-app.post('/signup', function (req, res) {
-    var retVal = {};
-    var status_var;
-    // Accepts the Name, Email, Phone Number and Password along with Secret
-    if (req.body.name && req.body.password && req.body.phoneno && req.body.email && req.body.secret) {
-        // Parameters are fine
-
-        if (req.body.secret == secret) {
-            // Authorized for further operations, insert the user into the database
-            var hashed_password = crypto.createHmac('sha256', secret).update(req.body.password).digest('hex');
-
-            var query = "INSERT INTO users(email,name,phoneno,password) VALUES('" + req.body.email + "','" + req.body.name + "','" + req.body.phoneno + "','" + hashed_password + "');";
-
-            var request = new Request(query, function (err, rowCount, rows) {
-                if (err) {
-                    
-                    status_var = false;
-                    retVal["error"] = err.message;
-                }
-                else {
-                    status_var = true;
-                }
-                retVal["status"] = status_var;
-                res.send(retVal);
-            });
-            connection.execSql(request);
-        }
-        else {
-            // Unauthorized access
-            retVal["error"] = "Unauthorized Access";
-            retVal["status"] = false;
-            res.send(retVal);
-        }
-    }
-    else {
-        // Not enough parameters passed
-        retVal["status"] = false;
-        retVal["error"] = "Not enough parameters passed";
-        res.send(retVal);
-    }
-});
 // error handlers
 /*
 // development error handler
