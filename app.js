@@ -277,13 +277,14 @@ app.post('/additem', function (req, res) {
         if (req.body.secret == secret) {
             // Authorized for further operations
             var query;
+            var item_id;
             if (req.body.location_name && req.body.longitude && req.body.latitude) {
                 // Location stuff was specified
-                query = "INSERT INTO list_contents(list_id, email, item_name, location_name, longitude, latitude,done) VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name + "','" + req.body.location_name + "'," + req.body.longitude + "," + req.body.latitude + ",0);";
+                query = "INSERT INTO list_contents(list_id, email, item_name, location_name, longitude, latitude,done) OUTPUT Inserted.item_id VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name + "','" + req.body.location_name + "'," + req.body.longitude + "," + req.body.latitude + ",0);";
             }
             else {
                 // Location stuff was not specified
-                query = "INSERT INTO list_contents(list_id, email, item_name,done) VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name + "',0);";
+                query = "INSERT INTO list_contents(list_id, email, item_name,done) OUTPUT Inserted.item_id VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name + "',0);";
             }
 
             var request = new Request(query, function (err, rowCount, rows) {
@@ -295,7 +296,15 @@ app.post('/additem', function (req, res) {
                     status_var = 200;
                 }
                 retVal["status"] = status_var;
+                if (status_var = 200) {
+                    retVal["item_id"] = item_id;
+                }
                 res.send(retVal);
+            });
+            request.on('row', function (columns) {
+                columns.forEach(function (column) {
+                    item_id = column.value;
+                });
             });
             connection.execSql(request);
         }
