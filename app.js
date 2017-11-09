@@ -250,7 +250,7 @@ app.post('/unshare', function (req, res) {
     }
 });
 
-app.post('/addlist', function (req, res) {
+app.post('/createlist', function (req, res) {
     var retVal = {};
     var status_var;
     // Accepts the name of the list (title in DB) and email id of the owner (owner in DB) along with Secret
