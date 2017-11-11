@@ -158,13 +158,15 @@ app.post('/getalllists', function (req, res) {
     //Accepts email and secret
     var retVal = {};
     var result_list = [];
+    var list_list_ids = [];
+    var counter = 0;
     var status_var;
     var flag = false;
     if (req.body.email && req.body.secret) {
         // Parameters are fine
         if (req.body.secret == secret) {
             // Authorized for operation
-            var query = "SELECT * FROM lists WHERE owner = '" + req.body.email + "';";
+            {/*var query = "SELECT list_contents.list_id, list_contents.item_id, list_contents.email, list_contents.item_name, list_contents.location_name, list_contents.longitude, list_contents.latitude, list_contents.done, lists.owner, lists.title FROM list_contents INNER JOIN lists ON lists.list_id = list_contents.list_id WHERE list_contents.list_id IN (SELECT list_id FROM lists WHERE owner = '" + req.body.email +"');";
 
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
@@ -175,7 +177,7 @@ app.post('/getalllists', function (req, res) {
                     //status_var = 200;
                     if (flag == true) {
                         status_var = 200;
-                        retVal["rows"] = result_list;
+                        retVal["lists"] = result_list;
                     }
                     else {
                         status_var = 404;
@@ -188,12 +190,104 @@ app.post('/getalllists', function (req, res) {
 
             request.on('row', function (columns) {
                 flag = true;
-                var user = {};
+                var index = -1;
+                var item = {};
                 columns.forEach(function (column) {
-                    user[column.metadata.colName] = column.value;
+
+                    if (column.metadata.colName == "list_id") {
+
+                        if (!(column.value in list_list_ids)) {
+                            index = counter;
+                            list_list_ids[column.value] = counter;
+                            counter++;
+                            result_list[index] = {};
+                            result_list[index]["list_id"] = column.value;
+                            result_list[index]["items"] = [];
+                        }
+                        else {
+                            index = list_list_ids[column.value];
+                        }
+                        
+                    }
+                    else if (column.metadata.colName == "owner" || column.metadata.colName == "title") {
+                        result_list[index][column.metadata.colName] = column.value;
+                    }
+                    else {
+                        item[column.metadata.colName] = column.value;
+                    }
+
                 });
-                result_list.push(user);
+                result_list[index]["items"].push(item);
+            });*/}
+            var query = "SELECT list_id,title FROM lists WHERE owner = '" + req.body.email + "';";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                }
+                else {
+
+                    if (flag == false) {
+                        status_var = 404;
+                        retVal["error"] = "No lists found for this user";
+                    }
+                    else {
+                        var temp = Object.keys(list_list_ids).join();
+                        var query1 = "SELECT * FROM list_contents WHERE list_id IN (" + temp + ");";
+                        //console.log(query1);
+                        var request1 = new Request(query1, function (err, rowCount, rows) {
+                            if (err) {
+                                status_var = 500;
+                                retVal["error"] = err.message;
+                            }
+                            else {
+                                retVal["lists"] = result_list;
+                            }
+                            retVal["status"] = status_var;
+                            res.send(retVal);
+                        });
+                        request1.on('row', function (columns) {
+                            var index = -1;
+                            var item = {};
+                            //console.log(columns);
+                            columns.forEach(function (column) {
+                                if (column.metadata.colName == "list_id") {
+                                    index = list_list_ids[column.value];
+                                    result_list[index]["empty"] = false;
+                                }
+                                else {
+                                    item[column.metadata.colName] = column.value;
+                                }
+                            });
+                            //console.log(item);
+                            result_list[index]["items"].push(item);
+                        });
+                        connection.execSql(request1);
+                    }
+                }
+                
             });
+
+            request.on('row', function (columns) {
+                flag = true;
+                var index = -1;
+                columns.forEach(function (column) {
+                    if (column.metadata.colName == "list_id") {
+                        index = counter;
+                        list_list_ids[column.value] = index;
+                        result_list[index] = {};
+                        result_list[index]["list_id"] = column.value;
+                        result_list[index]["empty"] = true;
+                        result_list[index]["items"] = [];
+                        counter++;                        
+                    }
+                    else {
+                        result_list[index]["title"] = column.value;
+                    }
+                });
+            });
+
             connection.execSql(request);
         }
         else {
@@ -211,7 +305,7 @@ app.post('/getalllists', function (req, res) {
     }
 });
 
-app.post('/getlistcontents', function (req, res) {
+{/*app.post('/getlistcontents', function (req, res) {
     //Accepts a list_id and secret
     var retVal = {};
     var result_list = [];
@@ -267,7 +361,7 @@ app.post('/getlistcontents', function (req, res) {
         res.send(retVal);
     }
 });
-
+*/}
 app.post('/additem', function (req, res) {
     var retVal = {};
     var status_var;
