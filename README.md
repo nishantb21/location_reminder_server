@@ -227,11 +227,12 @@ The URL for the API is locationreminder.azurewebsites.net
 	```
 	
 10. /createlist
-	* Input : list_id, src_email and label
+	* Input : list_name, email and secret
 	* Output :
 	```
 		{
 			status : 200
+			list_id : list id will be returned here - save for further insertions and deletions
 		}
 		OR 
 		{

@@ -539,6 +539,7 @@ app.post('/unshare', function (req, res) {
 app.post('/createlist', function (req, res) {
     var retVal = {};
     var status_var;
+    var list_id;
     // Accepts the name of the list (title in DB) and email id of the owner (owner in DB) along with Secret
     if (req.body.list_name && req.body.email && req.body.secret) {
         // Parameters are fine
@@ -546,7 +547,7 @@ app.post('/createlist', function (req, res) {
         if (req.body.secret == secret) {
             // Authorized for further operations, insert the user into the database
 
-            var query = "INSERT INTO lists (owner,title) VALUES('" + req.body.email + "','" + req.body.list_name + "');";
+            var query = "INSERT INTO lists (owner,title) OUTPUT Inserted.list_id VALUES('" + req.body.email + "','" + req.body.list_name + "');";
 
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
@@ -555,28 +556,17 @@ app.post('/createlist', function (req, res) {
                 }
                 else {
                     status_var = 200;
-
-                    var query1 = "select list_id from lists where owner = '" + req.body.email + "' and title = '" + req.body.list_name + "';";
-                    var request1 = new Request(query1, function (err, rowCount, rows) {
-                        if (err) {
-                            console.log(err);
-                        }
-                    });
-
-                    request1.on('row', function (columns) {
-
-                        columns.forEach(function (column) {
-                            retVal[column.metadata.colName] = column.value;
-                        });
-                        res.send(retVal);
-                    });
-
-
-                    connection.execSql(request1);
-
                 }
                 retVal["status"] = status_var;
-
+                if (status_var == 200) {
+                    retVal["list_id"] = list_id;
+                }
+                res.send(retVal);
+            });
+            request.on('row', function (columns) {
+                columns.forEach(function (column) {
+                    list_id = column.value;
+                });
             });
             connection.execSql(request);
         }
