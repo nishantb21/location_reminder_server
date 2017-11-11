@@ -59,8 +59,40 @@ The URL for the API is locationreminder.azurewebsites.net
 	* Output : 
 	``` 
 		{
-			status : 200
-			rows : [This will be an array of all lists for the given user]
+			"lists": [
+				{
+					"list_id": 12,
+					"empty": false,
+					"items": [
+						{
+							"item_id": 15,
+							"email": "nishantb21@gmail.com",
+							"item_name": "laptop",
+							"location_name": "cr road",
+							"longitude": 77.89123,
+							"latitude": 12.76878,
+							"done": false
+						},
+						{
+							"item_id": 16,
+							"email": "nishantb21@gmail.com",
+							"item_name": "Milk and Eggs",
+							"location_name": null,
+							"longitude": null,
+							"latitude": null,
+							"done": false
+						}
+					],
+					"title": "testing_3"
+				},
+				{
+					"list_id": 13,
+					"empty": true,
+					"items": [],
+					"title": "testing_4"
+				}
+			],
+			"status": 200
 		}
 		OR 
 		{
@@ -79,32 +111,7 @@ The URL for the API is locationreminder.azurewebsites.net
 		}
 	```
 
-4. /getlistcontents 
-	* Input : list_id, secret
-	* Output :
-	``` 
-		{
-			status : 200
-			rows : [List contents of the supplied list ID]
-		}
-		OR 
-		{
-			status : 405 
-			error : "Uauthorized Access"
-		}
-		OR 
-		{
-			status : 400
-			error : "Not enough parameters passed"
-		}
-		OR
-		{
-			status : 500
-			error : "Some database error"
-		}
-	```
-
-5. /additem
+4. /additem
 	* Input : list_id, email, item_name, location_name, latitude, logitude and secret
 	* Notes : Atleast list_id, email, item_name and secret should be there. Email here refers to the user who adds the item
 	* Output :
@@ -130,7 +137,7 @@ The URL for the API is locationreminder.azurewebsites.net
 		}
 	```
 
-6. /deleteitem
+5. /deleteitem
 	* Input : list_id, item_id and secret
 	* Output : 
 	``` 
@@ -154,7 +161,7 @@ The URL for the API is locationreminder.azurewebsites.net
 		}
 	```
 
-7. /markdone 
+6. /markdone 
 	* Input : list_id, item_id and secret 
 	* Output :
 	``` 
@@ -178,7 +185,7 @@ The URL for the API is locationreminder.azurewebsites.net
 		}
 	```
 
-8. /share 
+7. /share 
 	* Input : list_id, src_email and label
 	* Output :
 	```
@@ -202,7 +209,7 @@ The URL for the API is locationreminder.azurewebsites.net
 		}
 	```
 
-9. /unshare
+8. /unshare
 	* Input : list_id, src_email and label
 	* Output :
 	```
@@ -226,7 +233,7 @@ The URL for the API is locationreminder.azurewebsites.net
 		}
 	```
 	
-10. /createlist
+9. /createlist
 	* Input : list_name, email and secret
 	* Output :
 	```
@@ -251,7 +258,7 @@ The URL for the API is locationreminder.azurewebsites.net
 		}
 	```
 
-11. /deletelist
+10. /deletelist
 	* Input : list_id, src_email and label
 	* Output :
 	```
