@@ -242,6 +242,7 @@ app.post('/getalllists', function (req, res) {
                                 retVal["error"] = err.message;
                             }
                             else {
+                                status_var = 200;
                                 retVal["lists"] = result_list;
                             }
                             retVal["status"] = status_var;
