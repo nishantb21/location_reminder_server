@@ -17,8 +17,9 @@ var crypto = require('crypto');
 
 var app = express();
 
-var tokens = [];
+var flag_connection = false;
 
+//var interval;
 var config = {
     userName: 'manager',
     password: 'Root1234',
@@ -36,6 +37,7 @@ connection.on('connect', function (err) {
     }
     else {
         console.log("Connected!");
+        flag_connection = true; 
     }
 });
 
@@ -56,6 +58,21 @@ app.use('/users', users);
 
 // catch 404 and forward to error handler
 var secret = "fb943a2432995dc8114f15f868bbec305fac35b82e610286a2155e807cb577d4";
+
+function makeCall(request) {
+    var interval;
+    if (flag_connection == false) {
+        interval = setInterval(function () {
+            if (flag_connection == true) {
+                connection.execSql(request);
+                clearInterval(interval);
+            }
+        }, 100);
+    }
+    else {
+        connection.execSql(request);
+    }
+}
 
 app.post('/signup', function (req, res) {
     var retVal = {};
@@ -82,7 +99,7 @@ app.post('/signup', function (req, res) {
                 retVal["status"] = status_var;
                 res.send(retVal);
             });
-            connection.execSql(request);
+            makeCall(request);
         }
         else {
             // Unauthorized access
@@ -136,7 +153,7 @@ app.post('/login', function (req, res) {
             request.on('row', function (columns) {
                 flag = true;
             });
-            connection.execSql(request);
+            makeCall(request);
         }
         else {
             // Unauthorized access
@@ -166,76 +183,26 @@ app.post('/getalllists', function (req, res) {
         // Parameters are fine
         if (req.body.secret == secret) {
             // Authorized for operation
-            {/*var query = "SELECT list_contents.list_id, list_contents.item_id, list_contents.email, list_contents.item_name, list_contents.location_name, list_contents.longitude, list_contents.latitude, list_contents.done, lists.owner, lists.title FROM list_contents INNER JOIN lists ON lists.list_id = list_contents.list_id WHERE list_contents.list_id IN (SELECT list_id FROM lists WHERE owner = '" + req.body.email +"');";
-
-            var request = new Request(query, function (err, rowCount, rows) {
-                if (err) {
-                    status_var = 500;
-                    retVal["error"] = err.message;
-                }
-                else {
-                    //status_var = 200;
-                    if (flag == true) {
-                        status_var = 200;
-                        retVal["lists"] = result_list;
-                    }
-                    else {
-                        status_var = 404;
-                        retVal["error"] = "No lists found."
-                    }
-                }
-                retVal["status"] = status_var;
-                res.send(retVal);
-            });
-
-            request.on('row', function (columns) {
-                flag = true;
-                var index = -1;
-                var item = {};
-                columns.forEach(function (column) {
-
-                    if (column.metadata.colName == "list_id") {
-
-                        if (!(column.value in list_list_ids)) {
-                            index = counter;
-                            list_list_ids[column.value] = counter;
-                            counter++;
-                            result_list[index] = {};
-                            result_list[index]["list_id"] = column.value;
-                            result_list[index]["items"] = [];
-                        }
-                        else {
-                            index = list_list_ids[column.value];
-                        }
-                        
-                    }
-                    else if (column.metadata.colName == "owner" || column.metadata.colName == "title") {
-                        result_list[index][column.metadata.colName] = column.value;
-                    }
-                    else {
-                        item[column.metadata.colName] = column.value;
-                    }
-
-                });
-                result_list[index]["items"].push(item);
-            });*/}
             var query = "SELECT list_id,title FROM lists WHERE owner = '" + req.body.email + "';";
 
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
                     status_var = 500;
                     retVal["error"] = err.message;
+                    retVal["status"] = status_var;
+                    res.send(retVal);
                 }
                 else {
 
                     if (flag == false) {
                         status_var = 404;
                         retVal["error"] = "No lists found for this user";
+                        retVal["status"] = status_var;
+                        res.send(retVal);
                     }
                     else {
                         var temp = Object.keys(list_list_ids).join();
                         var query1 = "SELECT * FROM list_contents WHERE list_id IN (" + temp + ");";
-                        //console.log(query1);
                         var request1 = new Request(query1, function (err, rowCount, rows) {
                             if (err) {
                                 status_var = 500;
@@ -251,7 +218,6 @@ app.post('/getalllists', function (req, res) {
                         request1.on('row', function (columns) {
                             var index = -1;
                             var item = {};
-                            //console.log(columns);
                             columns.forEach(function (column) {
                                 if (column.metadata.colName == "list_id") {
                                     index = list_list_ids[column.value];
@@ -261,10 +227,9 @@ app.post('/getalllists', function (req, res) {
                                     item[column.metadata.colName] = column.value;
                                 }
                             });
-                            //console.log(item);
                             result_list[index]["items"].push(item);
                         });
-                        connection.execSql(request1);
+                        makeCall(request1);
                     }
                 }
                 
@@ -288,8 +253,7 @@ app.post('/getalllists', function (req, res) {
                     }
                 });
             });
-
-            connection.execSql(request);
+            makeCall(request);
         }
         else {
             // Unauthorized access
@@ -306,7 +270,7 @@ app.post('/getalllists', function (req, res) {
     }
 });
 
-{/*app.post('/getlistcontents', function (req, res) {
+app.post('/getlistcontents', function (req, res) {
     //Accepts a list_id and secret
     var retVal = {};
     var result_list = [];
@@ -346,7 +310,8 @@ app.post('/getalllists', function (req, res) {
                 });
                 result_list.push(user);
             });
-            connection.execSql(request);
+            makeCall(request);
+            
         }
         else {
             // Unauthorized access
@@ -362,7 +327,7 @@ app.post('/getalllists', function (req, res) {
         res.send(retVal);
     }
 });
-*/}
+
 app.post('/additem', function (req, res) {
     var retVal = {};
     var status_var;
@@ -401,7 +366,7 @@ app.post('/additem', function (req, res) {
                     item_id = column.value;
                 });
             });
-            connection.execSql(request);
+            makeCall(request);
         }
         else {
             // Unauthorized access
@@ -421,12 +386,13 @@ app.post('/additem', function (req, res) {
 app.post('/deleteitem', function (req, res) {
     var retVal = {};
     var status_var;
+    var row_count;
     // Accepts list_id, item_id and secret
     if (req.body.list_id && req.body.item_id && req.body.secret) {
         // Parameters are fine
         if (req.body.secret == secret) {
             // Authorized for further operations
-            var query = "DELETE FROM list_contents WHERE list_id = " + req.body.list_id + " AND item_id = " + req.body.item_id + ";";
+            var query = "DELETE FROM list_contents WHERE list_id = " + req.body.list_id + " AND item_id = " + req.body.item_id + " SELECT @@ROWCOUNT AS deleted;";
 
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
@@ -434,12 +400,24 @@ app.post('/deleteitem', function (req, res) {
                     retVal["error"] = err.message;
                 }
                 else {
-                    status_var = 200;
+                    if (row_count == 0) {
+                        status_var = 404;
+                        retVal["error"] = "Either the list_id or the item_id or both don't exist."
+                    }
+                    else {
+                        status_var = 200;
+                    }
                 }
                 retVal["status"] = status_var;
                 res.send(retVal);
             });
-            connection.execSql(request);
+
+            request.on("row", function (columns) {
+                columns.forEach(function (column) {
+                    row_count = column.value;
+                }); 
+            });
+            makeCall(request);
         }
         else {
             // Unauthorized access
@@ -479,7 +457,7 @@ app.post('/markdone', function (req, res) {
                 retVal["status"] = status_var;
                 res.send(retVal);
             });
-            connection.execSql(request);
+            makeCall(request);
         }
         else {
             // Unauthorized access
@@ -531,7 +509,7 @@ app.post('/share', function (req, res) {
                             console.log(err);
                         }
                     });
-                    connection.execSql(request1);
+                    makeCall(request1);
                 }
                 retVal["status"] = status_var;
                 res.send(retVal);
@@ -599,7 +577,7 @@ app.post('/unshare', function (req, res) {
                             console.log(err);
                         }
                     });
-                    connection.execSql(request1);
+                    makeCall(request1);
                 }
                 retVal["status"] = status_var;
                 res.send(retVal);
@@ -663,7 +641,7 @@ app.post('/createlist', function (req, res) {
                     list_id = column.value;
                 });
             });
-            connection.execSql(request);
+            makeCall(request);
         }
         else {
             // Unauthorized access
@@ -682,15 +660,16 @@ app.post('/createlist', function (req, res) {
 
 app.post('/deletelist', function (req, res) {
     var retVal = {};
+    var row_count;
     var status_var;
-    // Accepts the id of the list (title in DB) and email id of the owner (owner in DB) along with Secret
-    if (req.body.list_id && req.body.email && req.body.secret) {
+    // Accepts the id of the list (title in DB) along with Secret
+    if (req.body.list_id && req.body.secret) {
         // Parameters are fine
 
         if (req.body.secret == secret) {
             // Authorized for further operations, insert the user into the database
 
-            var query = "DELETE from lists WHERE owner = '" + req.body.email + "' and list_id = '" + req.body.list_id + "' ;";
+            var query = "DELETE from lists WHERE  list_id = '" + req.body.list_id + "' SELECT @@ROWCOUNT AS deleted;";
 
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
@@ -698,12 +677,25 @@ app.post('/deletelist', function (req, res) {
                     retVal["error"] = err.message;
                 }
                 else {
-                    status_var = 200;
+                    if (row_count == 0) {
+                        status_var = 404;
+                        retVal["error"] = "The list_id is invalid."
+                    }
+                    else {
+                        status_var = 200;
+                    }
                 }
                 retVal["status"] = status_var;
                 res.send(retVal);
             });
-            connection.execSql(request);
+
+            request.on("row", function (columns) {
+                columns.forEach(function (column) {
+                    row_count = column.value;
+                });
+            });
+
+            makeCall(request);
         }
         else {
             // Unauthorized access
