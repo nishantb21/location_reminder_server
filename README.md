@@ -306,3 +306,28 @@ The URL for the API is locationreminder.azurewebsites.net
 			error : "Some database error"
 		}
 	```
+12. /getnotificationdetails
+	* Input : item_id and secret
+	* Output :
+	```
+		{
+			status : 200
+			location_name : location name given here
+			item_name : item name given here
+		}
+		OR 
+		{
+			status : 405 
+			error : "Uauthorized Access"
+		}
+		OR 
+		{
+			status : 400
+			error : "Not enough parameters passed"
+		}
+		OR
+		{
+			status : 500
+			error : "Some database error"
+		}
+	```
