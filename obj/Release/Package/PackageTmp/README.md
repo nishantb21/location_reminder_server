@@ -259,12 +259,36 @@ The URL for the API is locationreminder.azurewebsites.net
 	```
 
 10. /deletelist
-	* Input : list_id, src_email and label
+	* Input : list_id and secret
 	* Output :
 	```
 		{
 			status : 200
-			list_id : list_id goes here - store this to support deletion
+		}
+		OR 
+		{
+			status : 405 
+			error : "Uauthorized Access"
+		}
+		OR 
+		{
+			status : 400
+			error : "Not enough parameters passed"
+		}
+		OR
+		{
+			status : 500
+			error : "Some database error"
+		}
+	```
+
+11. /getlistcontents
+	* Input : list_id and email
+	* Output :
+	```
+		{
+			status : 200
+			rows : an array of items with all their information
 		}
 		OR 
 		{

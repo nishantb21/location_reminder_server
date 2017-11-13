@@ -712,6 +712,61 @@ app.post('/deletelist', function (req, res) {
     }
 });
 
+app.post('/getnotificationdetails', function (req, res) {
+    //Accepts item_id and secret
+    var retVal = {};
+    var status_var;
+    var flag = false;
+    if (req.body.item_id && req.body.secret) {
+        // Parameters are fine
+
+        if (req.body.secret == secret) {
+            // Authorized for operations
+
+            var query = "SELECT location_name,item_name FROM list_contents WHERE item_id = " + req.body.item_id + ";";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                }
+                else {
+                    if (flag == true) {
+                        status_var = 200;
+                    }
+                    else {
+                        status_var = 404;
+                        retVal["error"] = "Item_id is incorrect."
+                    }
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+
+            request.on('row', function (columns) {
+                flag = true;
+                columns.forEach(function (column) {
+                    retVal[column.metadata.colName] = column.value;
+                });
+            });
+            makeCall(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+
+});
+
 {// error handlers
 /*
 // development error handler
