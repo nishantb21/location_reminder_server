@@ -990,6 +990,158 @@ app.post('/viewfriends', function (req, res) {
     }
 });
 
+app.post('/viewpeerlists', function (req, res) {
+    //Accepts email and secret
+    var retVal = {};
+    var result_list = [];
+    var list_list_ids = [];
+    var counter = 0;
+    var status_var;
+    var flag = false;
+    if (req.body.email && req.body.secret) {
+        // Parameters are fine
+        if (req.body.secret == secret) {
+            // Authorized for operation
+            var query = "SELECT list_id,title FROM lists WHERE owner = '" + req.body.email + "' AND shareable = '1';";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                    retVal["status"] = status_var;
+                    res.send(retVal);
+                }
+                else {
+
+                    if (flag == false) {
+                        status_var = 404;
+                        retVal["error"] = "No lists found for this user";
+                        retVal["status"] = status_var;
+                        res.send(retVal);
+                    }
+                    else {
+                        var temp = Object.keys(list_list_ids).join();
+                        var query1 = "SELECT * FROM list_contents WHERE list_id IN (" + temp + ");";
+                        var request1 = new Request(query1, function (err, rowCount, rows) {
+                            if (err) {
+                                status_var = 500;
+                                retVal["error"] = err.message;
+                            }
+                            else {
+                                status_var = 200;
+                                retVal["lists"] = result_list;
+                            }
+                            retVal["status"] = status_var;
+                            res.send(retVal);
+                        });
+                        request1.on('row', function (columns) {
+                            var index = -1;
+                            var item = {};
+                            columns.forEach(function (column) {
+                                if (column.metadata.colName == "list_id") {
+                                    index = list_list_ids[column.value];
+                                    result_list[index]["empty"] = false;
+                                }
+                                else {
+                                    item[column.metadata.colName] = column.value;
+                                }
+                            });
+                            result_list[index]["items"].push(item);
+                        });
+                        makeCall(request1);
+                    }
+                }
+
+            });
+
+            request.on('row', function (columns) {
+                flag = true;
+                var index = -1;
+                columns.forEach(function (column) {
+                    if (column.metadata.colName == "list_id") {
+                        index = counter;
+                        list_list_ids[column.value] = index;
+                        result_list[index] = {};
+                        result_list[index]["list_id"] = column.value;
+                        result_list[index]["empty"] = true;
+                        result_list[index]["items"] = [];
+                        counter++;
+                    }
+                    else {
+                        result_list[index]["title"] = column.value;
+                    }
+                });
+            });
+            makeCall(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
+
+app.post('/makepublic', function (req, res) {
+    var retVal = {};
+    var status_var;
+    var updated = 0;
+    // Accepts the list_id and Secret
+    if (req.body.list_id && req.body.secret) {
+        // Parameters are fine
+
+        if (req.body.secret == secret) {
+            // Authorized for further operations
+
+            var query = "UPDATE lists SET shareable = '1' WHERE list_id = " + req.body.list_id + "; SELECT @@ROWCOUNT AS updated";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                }
+                else {
+                    if (updated == 0) {
+                        status_var = 404;
+                        retVal["error"] = "The list_id was not found."
+                    }
+                    else {
+                        status_var = 200;
+                    }
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+
+            request.on('row', function (columns) {
+                columns.forEach(function (column) {
+                    updated = column.value;
+                });
+            });
+            makeCall(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
+
 {// error handlers
 /*
 // development error handler

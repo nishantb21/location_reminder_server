@@ -331,7 +331,7 @@ The URL for the API is locationreminder.azurewebsites.net
 			error : "Some database error"
 		}
 	```
-14. /addfriend
+13. /addfriend
 	* Input : src_email, dest_email and secret
 	* Output :
 	```
@@ -360,7 +360,7 @@ The URL for the API is locationreminder.azurewebsites.net
 		}
 	```
 
-15. /viewfriends 
+14. /viewfriends 
 	* Input : email and secret
 	* Output : 
 	```
@@ -387,5 +387,91 @@ The URL for the API is locationreminder.azurewebsites.net
 		{
 			status : 404
 			error : "User has no friends."
+		}
+	```
+
+15. /makepublic
+	* Input : list_id and secret
+	* Output : 
+	```
+		{
+			status : 200
+			friends : [List of JSON objects each containing email and name as the fields]
+		}
+		OR 
+		{
+			status : 405 
+			error : "Uauthorized Access"
+		}
+		OR 
+		{
+			status : 400
+			error : "Not enough parameters passed"
+		}
+		OR
+		{
+			status : 500
+			error : "Some database error"
+		}
+		OR
+		{
+			status : 404
+			error : "Invalid list_id."
+	```
+
+16. /viewpeerlists 
+	* Input : email, secret
+	* Output : 
+	``` 
+		{
+			"lists": [
+				{
+					"list_id": 12,
+					"empty": false,
+					"items": [
+						{
+							"item_id": 15,
+							"email": "nishantb21@gmail.com",
+							"item_name": "laptop",
+							"location_name": "cr road",
+							"longitude": 77.89123,
+							"latitude": 12.76878,
+							"done": false
+						},
+						{
+							"item_id": 16,
+							"email": "nishantb21@gmail.com",
+							"item_name": "Milk and Eggs",
+							"location_name": null,
+							"longitude": null,
+							"latitude": null,
+							"done": false
+						}
+					],
+					"title": "testing_3"
+				},
+				{
+					"list_id": 13,
+					"empty": true,
+					"items": [],
+					"title": "testing_4"
+				}
+			],
+			"status": 200
+		}
+		OR 
+		{
+			status : 405 
+			error : "Uauthorized Access"
+		}
+		OR 
+		{
+			status : 400
+			error : "Not enough parameters passed"
+		}
+		OR
+		{
+			status : 500
+			error : "Some database error"
 		}
 	```

@@ -12,6 +12,7 @@ var users = require('./routes/users');
 
 var Connection = require('tedious').Connection;
 var Request = require('tedious').Request;
+var request_http = require('request');
 
 var crypto = require('crypto');
 
@@ -30,6 +31,7 @@ var config = {
     }
 }
 var connection = new Connection(config)
+var default_label = "friends";
 
 connection.on('connect', function (err) {
     if (err) {
@@ -73,6 +75,98 @@ function makeCall(request) {
         connection.execSql(request);
     }
 }
+
+function sendMessageToUser(deviceId, message) {
+    request_http({
+        url: 'https://fcm.googleapis.com/fcm/send',
+        method: 'POST',
+        headers: {
+            'Content-Type': ' application/json',
+            'Authorization': 'key=AAAA7g74qf0:APA91bGvQ1EY77uCDs8YOkykRuEPpNyuPw-GwVTqv4EKz3re_NitZaAchvRZ6gg-QVjpZ3K_VI9p64YUvnFwe5EeTS55GGcxXYPWCGZyknDMPZksIwcZ_-mjv4F115btoM3fHj4p65CI'
+        },
+        body: JSON.stringify(
+            {
+                "data": {
+                    "message": message
+                },
+                "to": deviceId
+            }
+        )
+    }, function (error, response, body) {
+        if (error) {
+            console.error(error, response, body);
+        }
+        else if (response.statusCode >= 400) {
+            console.error('HTTP Error: ' + response.statusCode + ' - ' + response.statusMessage + '\n' + body);
+        }
+        else {
+            console.log('Done!')
+        }
+    });
+}
+
+app.post('/register', function (req, res) {
+    var retVal = {};
+    var status_var;
+    // Accepts the email, token and secret
+    if (req.body.email && req.body.token && req.body.secret){
+        // Parameters are fine
+        if (req.body.secret == secret) {
+            // Authorized for further operations
+
+            var query = "INSERT INTO tokens(email,token) VALUES('" + req.body.token + "','" + req.body.email + "');";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                }
+                else {
+                    status_var = 200;
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+            makeCall(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
+
+app.post('/sendDummyNotif', function (req, res) {
+    var query = "SELECT token FROM tokens";
+    var tokens = [];
+    var request = new Request(query, function (err, rowCount, rows) {
+        if (err) {
+            status_var = 500;
+            retVal["error"] = err.message;
+        }
+        else {
+            status_var = 200;
+            sendMessageToUser(tokens[0], { message: 'Hello puf' });
+        }
+        retVal["status"] = status_var;
+        res.send(retVal);
+    });
+
+    request.on('row', function (columns) {
+        columns.forEach(function (column) {
+            tokens.push(column.value);
+        });
+    });
+    makeCall(request);
+});
 
 app.post('/signup', function (req, res) {
     var retVal = {};
@@ -765,6 +859,287 @@ app.post('/getnotificationdetails', function (req, res) {
         res.send(retVal);
     }
 
+});
+
+app.post('/addfriend', function (req, res) {
+    //Accepts src_email, dest_email and secret
+    var retVal = {};
+    var status_var;
+    if (req.body.src_email && req.body.dest_email && req.body.secret) {
+        // Parameters are fine
+
+        if (req.body.secret == secret) {
+            // Authorized for operations
+            if (req.body.src_email != req.body.dest_email) {
+                var query = "INSERT INTO circles VALUES('" + req.body.src_email + "','" + req.body.dest_email + "','" + default_label + "'),('" + req.body.dest_email + "','" + req.body.src_email + "','" + default_label + "');";
+
+                var request = new Request(query, function (err, rowCount, rows) {
+                    if (err) {
+                        status_var = 500;
+                        retVal["error"] = err.message;
+                    }
+                    else {
+                        status_var = 200;
+                    }
+                    retVal["status"] = status_var;
+                    res.send(retVal);
+                });
+                makeCall(request);
+            }
+            else {
+                retVal["error"] = "Both emails cannot be same"
+                retVal["status"] = 401;
+            }
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+
+});
+
+app.post('/viewfriends', function (req, res) {
+    //Accepts email and secret
+    var retVal = {};
+    var status_var;
+    var indices = {};
+    var result_list = [];
+    var friend_list = [];
+    var flag = false;
+    if (req.body.email && req.body.secret) {
+        // Parameters are fine
+
+        if (req.body.secret == secret) {
+            // Authorized for operations
+
+            var query = "SELECT dest_email FROM circles WHERE src_email = '" + req.body.email + "';";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                    retVal["status"] = status_var;
+                    res.send(retVal);
+                }
+                else {
+                    if (flag == true) {
+                        status_var = 200;
+                        var query1 = "SELECT email,name FROM users WHERE email in (" + friend_list.map(function (x) { return "'" + x + "'" }).join() + ");";
+                        var request1 = new Request(query1, function (err, rowCount, rows) {
+                            if (err) {
+                                status_var = 500;
+                                retVal["error"] = err.message;
+                                retVal["status"] = status_var;
+                                res.send(retVal);
+                            }
+                            else {
+                                status_var = 200;
+                                retVal["friends"] = result_list;
+                                retVal["status"] = status_var;
+                                res.send(retVal);
+                            }
+                        });
+
+                        request1.on('row', function (columns) {
+                            var friend = {};
+                            columns.forEach(function (column) {
+                                friend[column.metadata.colName] = column.value;
+                            });
+                            result_list.push(friend);
+                        });
+                        makeCall(request1);
+                    }
+                    else {
+                        status_var = 404;
+                        retVal["error"] = "The user has no friends or doesn't exist."
+                        retVal["status"] = status_var;
+                        res.send(retVal);
+                    }
+                }
+            });
+
+            request.on('row', function (columns) {
+                flag = true;
+                columns.forEach(function (column) {
+                    friend_list.push(column.value);
+                });
+            });
+            makeCall(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
+
+app.post('/viewpeerlists', function (req, res) {
+    //Accepts email and secret
+    var retVal = {};
+    var result_list = [];
+    var list_list_ids = [];
+    var counter = 0;
+    var status_var;
+    var flag = false;
+    if (req.body.email && req.body.secret) {
+        // Parameters are fine
+        if (req.body.secret == secret) {
+            // Authorized for operation
+            var query = "SELECT list_id,title FROM lists WHERE owner = '" + req.body.email + "' AND shareable = '1';";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                    retVal["status"] = status_var;
+                    res.send(retVal);
+                }
+                else {
+
+                    if (flag == false) {
+                        status_var = 404;
+                        retVal["error"] = "No lists found for this user";
+                        retVal["status"] = status_var;
+                        res.send(retVal);
+                    }
+                    else {
+                        var temp = Object.keys(list_list_ids).join();
+                        var query1 = "SELECT * FROM list_contents WHERE list_id IN (" + temp + ");";
+                        var request1 = new Request(query1, function (err, rowCount, rows) {
+                            if (err) {
+                                status_var = 500;
+                                retVal["error"] = err.message;
+                            }
+                            else {
+                                status_var = 200;
+                                retVal["lists"] = result_list;
+                            }
+                            retVal["status"] = status_var;
+                            res.send(retVal);
+                        });
+                        request1.on('row', function (columns) {
+                            var index = -1;
+                            var item = {};
+                            columns.forEach(function (column) {
+                                if (column.metadata.colName == "list_id") {
+                                    index = list_list_ids[column.value];
+                                    result_list[index]["empty"] = false;
+                                }
+                                else {
+                                    item[column.metadata.colName] = column.value;
+                                }
+                            });
+                            result_list[index]["items"].push(item);
+                        });
+                        makeCall(request1);
+                    }
+                }
+
+            });
+
+            request.on('row', function (columns) {
+                flag = true;
+                var index = -1;
+                columns.forEach(function (column) {
+                    if (column.metadata.colName == "list_id") {
+                        index = counter;
+                        list_list_ids[column.value] = index;
+                        result_list[index] = {};
+                        result_list[index]["list_id"] = column.value;
+                        result_list[index]["empty"] = true;
+                        result_list[index]["items"] = [];
+                        counter++;
+                    }
+                    else {
+                        result_list[index]["title"] = column.value;
+                    }
+                });
+            });
+            makeCall(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
+
+app.post('/makepublic', function (req, res) {
+    var retVal = {};
+    var status_var;
+    var updated = 0;
+    // Accepts the list_id and Secret
+    if (req.body.list_id && req.body.secret) {
+        // Parameters are fine
+
+        if (req.body.secret == secret) {
+            // Authorized for further operations
+
+            var query = "UPDATE lists SET shareable = '1' WHERE list_id = " + req.body.list_id + "; SELECT @@ROWCOUNT AS updated";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                }
+                else {
+                    if (updated == 0) {
+                        status_var = 404;
+                        retVal["error"] = "The list_id was not found."
+                    }
+                    else {
+                        status_var = 200;
+                    }
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+
+            request.on('row', function (columns) {
+                columns.forEach(function (column) {
+                    updated = column.value;
+                });
+            });
+            makeCall(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
 });
 
 {// error handlers
