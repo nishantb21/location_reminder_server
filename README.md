@@ -331,3 +331,61 @@ The URL for the API is locationreminder.azurewebsites.net
 			error : "Some database error"
 		}
 	```
+14. /addfriend
+	* Input : src_email, dest_email and secret
+	* Output :
+	```
+		{
+			status : 200
+		}
+		OR 
+		{
+			status : 405 
+			error : "Uauthorized Access"
+		}
+		OR 
+		{
+			status : 400
+			error : "Not enough parameters passed"
+		}
+		OR
+		{
+			status : 500
+			error : "Some database error"
+		}
+		OR
+		{
+			status : 401
+			error : "Both emails cannot be the same."
+		}
+	```
+
+15. /viewfriends 
+	* Input : email and secret
+	* Output : 
+	```
+		{
+			status : 200
+			friends : [List of JSON objects each containing email and name as the fields]
+		}
+		OR 
+		{
+			status : 405 
+			error : "Uauthorized Access"
+		}
+		OR 
+		{
+			status : 400
+			error : "Not enough parameters passed"
+		}
+		OR
+		{
+			status : 500
+			error : "Some database error"
+		}
+		OR
+		{
+			status : 404
+			error : "User has no friends."
+		}
+	```
