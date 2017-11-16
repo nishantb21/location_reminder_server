@@ -82,28 +82,28 @@ function sendMessageToUser(deviceId, message) {
         method: 'POST',
         headers: {
             'Content-Type': ' application/json',
-            'Authorization': 'key=AAAA7g74qf0:APA91bGvQ1EY77uCDs8YOkykRuEPpNyuPw-GwVTqv4EKz3re_NitZaAchvRZ6gg-QVjpZ3K_VI9p64YUvnFwe5EeTS55GGcxXYPWCGZyknDMPZksIwcZ_-mjv4F115btoM3fHj4p65CI'
+            'Authorization': 'key=AAAAHm4FIKY:APA91bEbVbP-2TZHr-uJ0d7x09cgI01IXv9EKyl3MjH_NCqtwtr2CR87Ra_7RqoJrPG7rZZy0OOi3_0gj8OHqM6oOpMit3cDKOb7a6CjxWpKUBYJywK8Q5v0pLhBMdQM3xf13UJl2Yzl'
         },
         body: JSON.stringify(
             {
-                "data": {
-                    "message": message
-                },
-                "to": deviceId
+                'to': deviceId,
+                'notification': {
+                    'title': 'Notification',
+                    'body': message
+                }
             }
         )
     }, function (error, response, body) {
-        if (error) {
-            console.error(error, response, body);
-        }
-        else if (response.statusCode >= 400) {
-            console.error('HTTP Error: ' + response.statusCode + ' - ' + response.statusMessage + '\n' + body);
+        console.log(response);
+        if (error || (response.statusCode >= 400)) {
+            return 0;
         }
         else {
-            console.log('Done!')
+            return 1;
         }
     });
 }
+
 
 app.post('/register', function (req, res) {
     var retVal = {};
@@ -277,7 +277,7 @@ app.post('/getalllists', function (req, res) {
         // Parameters are fine
         if (req.body.secret == secret) {
             // Authorized for operation
-            var query = "SELECT list_id,title FROM lists WHERE owner = '" + req.body.email + "';";
+            var query = "SELECT list_id,title,shareable FROM lists WHERE owner = '" + req.body.email + "';";
 
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
@@ -340,10 +340,10 @@ app.post('/getalllists', function (req, res) {
                         result_list[index]["list_id"] = column.value;
                         result_list[index]["empty"] = true;
                         result_list[index]["items"] = [];
-                        counter++;                        
+                        counter++;
                     }
                     else {
-                        result_list[index]["title"] = column.value;
+                        result_list[index][column.metadata.colName] = column.value;
                     }
                 });
             });
@@ -1091,6 +1091,8 @@ app.post('/viewpeerlists', function (req, res) {
 
 app.post('/makepublic', function (req, res) {
     var retVal = {};
+    var email_list = [];
+    var device_token_list = [];
     var status_var;
     var updated = 0;
     // Accepts the list_id and Secret
@@ -1100,7 +1102,137 @@ app.post('/makepublic', function (req, res) {
         if (req.body.secret == secret) {
             // Authorized for further operations
 
-            var query = "UPDATE lists SET shareable = '1' WHERE list_id = " + req.body.list_id + "; SELECT @@ROWCOUNT AS updated";
+            var query = "UPDATE lists SET shareable = '1' OUTPUT INSERTED.owner WHERE list_id = " + req.body.list_id + ";";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["status"] = status_var;
+                    retVal["error"] = err.message;
+                    res.send(retVal);
+                }
+                else {
+                    if (updated == 0) {
+                        status_var = 404;
+                        retVal["status"] = status_var;
+                        retVal["error"] = "The list_id was not found."
+                        res.send(retVal);
+                    }
+                    else {
+                        /*var query1 = "";
+                        var request1 = new Request(query1, function (err, rowCount, rows) {
+                        });
+                        request1.on('row', function (columns) {
+                            columns.forEach(function (column) {
+                                device_token_list.push(email)
+                            });
+                        });*/
+                        retVal["status"] = 200;
+                        res.send(retVal);
+                    }
+                }
+            });
+
+            request.on('row', function (columns) {
+                updated++;
+                columns.forEach(function (column) {
+                    email_list.push(column.value);
+                });
+            });
+            makeCall(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
+
+app.post('/makeprivate', function (req, res) {
+    var retVal = {};
+    var email_list = [];
+    var device_token_list = [];
+    var status_var;
+    var updated = 0;
+    // Accepts the list_id and Secret
+    if (req.body.list_id && req.body.secret) {
+        // Parameters are fine
+
+        if (req.body.secret == secret) {
+            // Authorized for further operations
+
+            var query = "UPDATE lists SET shareable = '0' OUTPUT INSERTED.owner WHERE list_id = " + req.body.list_id + ";";
+
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["status"] = status_var;
+                    retVal["error"] = err.message;
+                    res.send(retVal);
+                }
+                else {
+                    if (updated == 0) {
+                        status_var = 404;
+                        retVal["status"] = status_var;
+                        retVal["error"] = "The list_id was not found."
+                        res.send(retVal);
+                    }
+                    else {
+                        /*var query1 = "";
+                        var request1 = new Request(query1, function (err, rowCount, rows) {
+                        });
+                        request1.on('row', function (columns) {
+                            columns.forEach(function (column) {
+                                device_token_list.push(email)
+                            });
+                        });*/
+                        retVal["status"] = 200;
+                        res.send(retVal);
+                    }
+                }
+            });
+
+            request.on('row', function (columns) {
+                updated++;
+                columns.forEach(function (column) {
+                    email_list.push(column.value);
+                });
+            });
+            makeCall(request);
+        }
+        else {
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
+        }
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
+});
+
+app.post('/tokenregistration', function (req, res) {
+    //Accepts token, email and secret
+    var retVal = {};
+    var status_var;
+    if (req.body.token && req.body.email && req.body.secret) {
+        // Parameters are fine
+
+        if (req.body.secret == secret) {
+            // Authorized for operations
+            var query = "IF EXISTS (SELECT * FROM Products WHERE id = ?) BEGIN (UPDATE tokens SET token = '" + req.body.token + "' WHERE email = '" + req.body.email + "') END ELSE BEGIN (INSERT INTO tokens(email,token) VALUES('" + req.body.email +  "','" + req.body.token + "')) END ";
 
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
@@ -1108,22 +1240,10 @@ app.post('/makepublic', function (req, res) {
                     retVal["error"] = err.message;
                 }
                 else {
-                    if (updated == 0) {
-                        status_var = 404;
-                        retVal["error"] = "The list_id was not found."
-                    }
-                    else {
-                        status_var = 200;
-                    }
+                    status_var = 200;
                 }
                 retVal["status"] = status_var;
                 res.send(retVal);
-            });
-
-            request.on('row', function (columns) {
-                columns.forEach(function (column) {
-                    updated = column.value;
-                });
             });
             makeCall(request);
         }

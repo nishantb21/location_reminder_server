@@ -6,42 +6,14 @@ var favicon = require('serve-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
-
 var routes = require('./routes/index');
 var users = require('./routes/users');
-
+var app = express();
 var Connection = require('tedious').Connection;
 var Request = require('tedious').Request;
 var request_http = require('request');
-
 var crypto = require('crypto');
 
-var app = express();
-
-var flag_connection = false;
-
-//var interval;
-var config = {
-    userName: 'manager',
-    password: 'Root1234',
-    server: 'delilah.database.windows.net',
-    options: {
-        database: 'test',
-        encrypt: true
-    }
-}
-var connection = new Connection(config)
-var default_label = "friends";
-
-connection.on('connect', function (err) {
-    if (err) {
-        console.log(err);
-    }
-    else {
-        console.log("Connected!");
-        flag_connection = true; 
-    }
-});
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -58,7 +30,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', routes);
 app.use('/users', users);
 
-// catch 404 and forward to error handler
+var flag_connection = false;
+var config = {
+    userName: 'manager',
+    password: 'Root1234',
+    server: 'delilah.database.windows.net',
+    options: {
+        database: 'test',
+        encrypt: true
+    }
+}
+var connection = new Connection(config)
+var default_label = "friends";
 var secret = "fb943a2432995dc8114f15f868bbec305fac35b82e610286a2155e807cb577d4";
 
 function makeCall(request) {
@@ -104,6 +87,15 @@ function sendMessageToUser(deviceId, message) {
     });
 }
 
+connection.on('connect', function (err) {
+    if (err) {
+        console.log(err);
+    }
+    else {
+        console.log("Connected!");
+        flag_connection = true;
+    }
+});
 
 app.post('/register', function (req, res) {
     var retVal = {};
@@ -142,30 +134,6 @@ app.post('/register', function (req, res) {
         retVal["error"] = "Not enough parameters passed";
         res.send(retVal);
     }
-});
-
-app.post('/sendDummyNotif', function (req, res) {
-    var query = "SELECT token FROM tokens";
-    var tokens = [];
-    var request = new Request(query, function (err, rowCount, rows) {
-        if (err) {
-            status_var = 500;
-            retVal["error"] = err.message;
-        }
-        else {
-            status_var = 200;
-            sendMessageToUser(tokens[0], { message: 'Hello puf' });
-        }
-        retVal["status"] = status_var;
-        res.send(retVal);
-    });
-
-    request.on('row', function (columns) {
-        columns.forEach(function (column) {
-            tokens.push(column.value);
-        });
-    });
-    makeCall(request);
 });
 
 app.post('/signup', function (req, res) {
@@ -528,7 +496,7 @@ app.post('/deleteitem', function (req, res) {
     }
 });
 
-app.post('/markdone', function (req, res) {
+{/*app.post('/markdone', function (req, res) {
     var retVal = {};
     var status_var;
     // Accepts the item_id and list_id along with Secret
@@ -701,7 +669,7 @@ app.post('/unshare', function (req, res) {
         }
         res.send(retVal);
     }
-});
+});*/}
 
 app.post('/createlist', function (req, res) {
     var retVal = {};
@@ -1091,8 +1059,8 @@ app.post('/viewpeerlists', function (req, res) {
 
 app.post('/makepublic', function (req, res) {
     var retVal = {};
-    var email_list = [];
     var device_token_list = [];
+    var notification = {};
     var status_var;
     var updated = 0;
     // Accepts the list_id and Secret
@@ -1102,7 +1070,7 @@ app.post('/makepublic', function (req, res) {
         if (req.body.secret == secret) {
             // Authorized for further operations
 
-            var query = "UPDATE lists SET shareable = '1' OUTPUT INSERTED.owner WHERE list_id = " + req.body.list_id + ";";
+            var query = "UPDATE lists SET shareable = '1' OUTPUT INSERTED.owner,INSERTED.title WHERE list_id = " + req.body.list_id + ";";
 
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
@@ -1119,16 +1087,26 @@ app.post('/makepublic', function (req, res) {
                         res.send(retVal);
                     }
                     else {
-                        /*var query1 = "";
+                        var query1 = "SELECT name FROM users WHERE ; SELECT token FROM tokens WHERE email IN (SELECT dest_email FROM list_contents WHERE src_email = '" + notification[owner] + "');";
                         var request1 = new Request(query1, function (err, rowCount, rows) {
+                            if (err) {
+                                status_var = 500;
+                                retVal["status"] = status_var;
+                                retVal["error"] = err.message;
+                                res.send(retVal);
+                            }
+                            else {
+                                status_var = 200;
+                                retVal["status"] = 200;
+                                res.send(retVal);
+                            }
                         });
                         request1.on('row', function (columns) {
                             columns.forEach(function (column) {
-                                device_token_list.push(email)
+                                device_token_list.push(column.value);
                             });
-                        });*/
-                        retVal["status"] = 200;
-                        res.send(retVal);
+                        });
+                        connection.execSql(request1);
                     }
                 }
             });
@@ -1262,30 +1240,26 @@ app.post('/tokenregistration', function (req, res) {
     }
 });
 
-{// error handlers
-/*
-// development error handler
-// will print stacktrace
-if (app.get('env') === 'development') {
-    app.use(function (err, req, res, next) {
-        res.status(err.status || 500);
-        res.render('error', {
-            message: err.message,
-            error: err
+app.post('/getnotifications', function (req, res) {
+    // TODO
+    var query = "SELECT * FROM users;SELECT * from lists;"
+    var request = new Request(query, function (error, rowCount, rows) {
+        if (error) {
+            console.log(error);
+        }
+        else {
+            console.log("success");
+        }
+    });
+    request.on("row", function (columns) {
+        columns.forEach(function (column) {
+            console.log(column.metadata.colName + ":" + column.value);
         });
     });
-}
-
-// production error handler
-// no stacktraces leaked to user
-app.use(function (err, req, res, next) {
-    res.status(err.status || 500);
-    res.render('error', {
-        message: err.message,
-        error: {}
-    });
+    res.send("Done");
+    connection.execSql(request);
 });
-*/}
+
 app.set('port', process.env.PORT || 3000);
 
 var server = app.listen(app.get('port'), function () {
