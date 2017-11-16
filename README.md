@@ -83,13 +83,15 @@ The URL for the API is locationreminder.azurewebsites.net
 							"done": false
 						}
 					],
-					"title": "testing_3"
+					"title": "testing_3",
+					"shareable" : "true"
 				},
 				{
 					"list_id": 13,
 					"empty": true,
 					"items": [],
-					"title": "testing_4"
+					"title": "testing_4",
+					"shareable" : "false"
 				}
 			],
 			"status": 200
@@ -396,7 +398,6 @@ The URL for the API is locationreminder.azurewebsites.net
 	```
 		{
 			status : 200
-			friends : [List of JSON objects each containing email and name as the fields]
 		}
 		OR 
 		{
@@ -474,4 +475,32 @@ The URL for the API is locationreminder.azurewebsites.net
 			status : 500
 			error : "Some database error"
 		}
+	```
+
+17. /makeprivate 
+	* Input : list_id and secret
+	* Output : 
+	```
+		{
+			status : 200
+		}
+		OR 
+		{
+			status : 405 
+			error : "Uauthorized Access"
+		}
+		OR 
+		{
+			status : 400
+			error : "Not enough parameters passed"
+		}
+		OR
+		{
+			status : 500
+			error : "Some database error"
+		}
+		OR
+		{
+			status : 404
+			error : "Invalid list_id."
 	```
