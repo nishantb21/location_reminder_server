@@ -6,42 +6,14 @@ var favicon = require('serve-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
-
 var routes = require('./routes/index');
 var users = require('./routes/users');
-
+var app = express();
 var Connection = require('tedious').Connection;
 var Request = require('tedious').Request;
 var request_http = require('request');
-
 var crypto = require('crypto');
 
-var app = express();
-
-var flag_connection = false;
-
-//var interval;
-var config = {
-    userName: 'manager',
-    password: 'Root1234',
-    server: 'delilah.database.windows.net',
-    options: {
-        database: 'test',
-        encrypt: true
-    }
-}
-var connection = new Connection(config)
-var default_label = "friends";
-
-connection.on('connect', function (err) {
-    if (err) {
-        console.log(err);
-    }
-    else {
-        console.log("Connected!");
-        flag_connection = true; 
-    }
-});
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -58,7 +30,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', routes);
 app.use('/users', users);
 
-// catch 404 and forward to error handler
+var flag_connection = false;
+var config = {
+    userName: 'manager',
+    password: 'Root1234',
+    server: 'delilah.database.windows.net',
+    options: {
+        database: 'test',
+        encrypt: true
+    }
+}
+var connection = new Connection(config)
+var default_label = "friends";
 var secret = "fb943a2432995dc8114f15f868bbec305fac35b82e610286a2155e807cb577d4";
 
 function makeCall(request) {
@@ -76,7 +59,8 @@ function makeCall(request) {
     }
 }
 
-function sendMessageToUser(deviceId, message) {
+function sendMessageToUser(deviceId, message, title) {
+    
     request_http({
         url: 'https://fcm.googleapis.com/fcm/send',
         method: 'POST',
@@ -86,24 +70,43 @@ function sendMessageToUser(deviceId, message) {
         },
         body: JSON.stringify(
             {
-                'to': deviceId,
+                'registration_ids': deviceId,
                 'notification': {
-                    'title': 'Notification',
+                    'title': title,
                     'body': message
                 }
             }
         )
     }, function (error, response, body) {
-        console.log(response);
+        console.log(response.body);
         if (error || (response.statusCode >= 400)) {
-            return 0;
-        }
-        else {
-            return 1;
+            console.log("FCM Error");
         }
     });
 }
 
+function createMessage(type, message_params) {
+    var message = "";
+    // Type 1 is when a user shares a new list 
+    // Type 2 is when a user adds an item to another list
+    if (type == 1) {
+        message = message_params["name"] + " has shared " + "'" + message_params["title"] + "'" + " with you.";
+    }
+    else {
+        message = message_params["editor"] + " has added " + message_params["item_name"] + " to " + message_params["list_name"];
+    }
+    return message;
+}
+
+connection.on('connect', function (err) {
+    if (err) {
+        console.log(err);
+    }
+    else {
+        console.log("Connected!");
+        flag_connection = true;
+    }
+});
 
 app.post('/register', function (req, res) {
     var retVal = {};
@@ -142,30 +145,6 @@ app.post('/register', function (req, res) {
         retVal["error"] = "Not enough parameters passed";
         res.send(retVal);
     }
-});
-
-app.post('/sendDummyNotif', function (req, res) {
-    var query = "SELECT token FROM tokens";
-    var tokens = [];
-    var request = new Request(query, function (err, rowCount, rows) {
-        if (err) {
-            status_var = 500;
-            retVal["error"] = err.message;
-        }
-        else {
-            status_var = 200;
-            sendMessageToUser(tokens[0], { message: 'Hello puf' });
-        }
-        retVal["status"] = status_var;
-        res.send(retVal);
-    });
-
-    request.on('row', function (columns) {
-        columns.forEach(function (column) {
-            tokens.push(column.value);
-        });
-    });
-    makeCall(request);
 });
 
 app.post('/signup', function (req, res) {
@@ -424,6 +403,9 @@ app.post('/getlistcontents', function (req, res) {
 
 app.post('/additem', function (req, res) {
     var retVal = {};
+    var item;
+    var list_metadata = {};
+    var editor;
     var status_var;
     // Accepts list_id, email, item_name, location_name, latitude, longitude and secret
     if (req.body.list_id && req.body.item_name && req.body.secret && req.body.email) {
@@ -431,10 +413,16 @@ app.post('/additem', function (req, res) {
         if (req.body.secret == secret) {
             // Authorized for further operations
             var query;
-            var item_id;
+            var item = {
+                "item_name": req.body.item_name,
+                "location_name": req.body.location_name
+            };
             if (req.body.location_name && req.body.longitude && req.body.latitude) {
                 // Location stuff was specified
-                query = "INSERT INTO list_contents(list_id, email, item_name, location_name, longitude, latitude,done) OUTPUT Inserted.item_id VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name + "','" + req.body.location_name + "'," + req.body.longitude + "," + req.body.latitude + ",0);";
+                query = "INSERT INTO list_contents(list_id, email, item_name, location_name, longitude, latitude,done) OUTPUT Inserted.item_id VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name + "','" + req.body.location_name + "'," + req.body.longitude + "," + req.body.latitude + ",0); SELECT owner,title FROM lists WHERE list_id = " + req.body.list_id + "; SELECT name FROM users WHERE email = '" + req.body.email + "'";
+                item["location_name"] = req.body.location_name;
+                item["logitude"] = req.body.longitude;
+                item["latitude"] = req.body.latitude;
             }
             else {
                 // Location stuff was not specified
@@ -448,6 +436,31 @@ app.post('/additem', function (req, res) {
                 }
                 else {
                     status_var = 200;
+                    if (list_metadata["owner"] != req.body.email) {
+                        var token = [];
+                        var query1 = "SELECT token FROM tokens WHERE email = '" + list_metadata["owner"] + "';"
+                        var request1 = (query1, function (error, rowCount, rows) {
+                            if (err) {
+                                
+                            }
+                            else {
+                                var message_params = {
+                                    "editor": editor,
+                                    "item_name": item["item_name"],
+                                    "list_name": list_metadata["title"]
+                                }
+                                var message = createMessage(2, message_params);
+                                sendMessageToUser(token, message, "New item added");
+                                
+                            }
+                        });
+                        request1.on('row', function (columns) {
+                            columns.forEach(function (column) {
+                                token.push(column.value);
+                            });
+                        });
+                        connection.execSql(request1);
+                    }
                 }
                 retVal["status"] = status_var;
                 if (status_var = 200) {
@@ -457,6 +470,15 @@ app.post('/additem', function (req, res) {
             });
             request.on('row', function (columns) {
                 columns.forEach(function (column) {
+                    if (column.metadata.colName == "item_id") {
+                        item[column.metadata.colName] = column.value;
+                    }
+                    else if (column.metadata.colName == "name"){
+                        editor = column.value; 
+                    }
+                    else {
+                        list_metadata[column.metadata.colName] = column.value;
+                    }
                     item_id = column.value;
                 });
             });
@@ -528,7 +550,7 @@ app.post('/deleteitem', function (req, res) {
     }
 });
 
-app.post('/markdone', function (req, res) {
+{/*app.post('/markdone', function (req, res) {
     var retVal = {};
     var status_var;
     // Accepts the item_id and list_id along with Secret
@@ -701,7 +723,7 @@ app.post('/unshare', function (req, res) {
         }
         res.send(retVal);
     }
-});
+});*/}
 
 app.post('/createlist', function (req, res) {
     var retVal = {};
@@ -1091,8 +1113,9 @@ app.post('/viewpeerlists', function (req, res) {
 
 app.post('/makepublic', function (req, res) {
     var retVal = {};
-    var email_list = [];
     var device_token_list = [];
+    var notification = {};
+    var message_params = {};
     var status_var;
     var updated = 0;
     // Accepts the list_id and Secret
@@ -1102,7 +1125,7 @@ app.post('/makepublic', function (req, res) {
         if (req.body.secret == secret) {
             // Authorized for further operations
 
-            var query = "UPDATE lists SET shareable = '1' OUTPUT INSERTED.owner WHERE list_id = " + req.body.list_id + ";";
+            var query = "UPDATE lists SET shareable = '1' OUTPUT INSERTED.owner,INSERTED.title WHERE list_id = " + req.body.list_id + ";";
 
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
@@ -1119,16 +1142,33 @@ app.post('/makepublic', function (req, res) {
                         res.send(retVal);
                     }
                     else {
-                        /*var query1 = "";
+                        var query1 = "SELECT name FROM users WHERE email = '" + notification["owner"] + "'; SELECT title FROM lists WHERE list_id = " + req.body.list_id + "; SELECT token FROM tokens WHERE email IN (SELECT dest_email FROM circles WHERE src_email = '" + notification["owner"] + "');";
                         var request1 = new Request(query1, function (err, rowCount, rows) {
+                            if (err) {
+                                status_var = 500;
+                                retVal["status"] = status_var;
+                                retVal["error"] = err.message;
+                                res.send(retVal);
+                            }
+                            else {
+                                var message = createMessage(1, message_params);
+                                sendMessageToUser(device_token_list, message, "New list added!");
+                                status_var = 200;
+                                retVal["status"] = 200;
+                                res.send(retVal);
+                            }
                         });
                         request1.on('row', function (columns) {
                             columns.forEach(function (column) {
-                                device_token_list.push(email)
+                                if (column.metadata.colName == "name" || column.metadata.colName == "title") {
+                                    message_params[column.metadata.colName] = column.value;
+                                }
+                                else {
+                                    device_token_list.push(column.value);
+                                }
                             });
-                        });*/
-                        retVal["status"] = 200;
-                        res.send(retVal);
+                        });
+                        connection.execSql(request1);
                     }
                 }
             });
@@ -1136,7 +1176,7 @@ app.post('/makepublic', function (req, res) {
             request.on('row', function (columns) {
                 updated++;
                 columns.forEach(function (column) {
-                    email_list.push(column.value);
+                    notification[column.metadata.colName] = column.value;
                 });
             });
             makeCall(request);
@@ -1232,8 +1272,7 @@ app.post('/tokenregistration', function (req, res) {
 
         if (req.body.secret == secret) {
             // Authorized for operations
-            var query = "IF EXISTS (SELECT * FROM Products WHERE id = ?) BEGIN (UPDATE tokens SET token = '" + req.body.token + "' WHERE email = '" + req.body.email + "') END ELSE BEGIN (INSERT INTO tokens(email,token) VALUES('" + req.body.email +  "','" + req.body.token + "')) END ";
-
+            var query = "IF EXISTS (SELECT * FROM tokens WHERE email = '" + req.body.email + "') BEGIN UPDATE tokens SET token = '" + req.body.token + "' WHERE email = '" + req.body.email + "' END ELSE BEGIN INSERT INTO tokens(email,token) VALUES('" + req.body.email +  "','" + req.body.token + "') END ";
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
                     status_var = 500;
@@ -1262,30 +1301,26 @@ app.post('/tokenregistration', function (req, res) {
     }
 });
 
-{// error handlers
-/*
-// development error handler
-// will print stacktrace
-if (app.get('env') === 'development') {
-    app.use(function (err, req, res, next) {
-        res.status(err.status || 500);
-        res.render('error', {
-            message: err.message,
-            error: err
+app.post('/getnotifications', function (req, res) {
+    // TODO
+    var query = "SELECT * FROM users;SELECT * from lists;"
+    var request = new Request(query, function (error, rowCount, rows) {
+        if (error) {
+            console.log(error);
+        }
+        else {
+            console.log("success");
+        }
+    });
+    request.on("row", function (columns) {
+        columns.forEach(function (column) {
+            console.log(column.metadata.colName + ":" + column.value);
         });
     });
-}
-
-// production error handler
-// no stacktraces leaked to user
-app.use(function (err, req, res, next) {
-    res.status(err.status || 500);
-    res.render('error', {
-        message: err.message,
-        error: {}
-    });
+    res.send("Done");
+    connection.execSql(request);
 });
-*/}
+
 app.set('port', process.env.PORT || 3000);
 
 var server = app.listen(app.get('port'), function () {

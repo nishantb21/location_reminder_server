@@ -59,7 +59,8 @@ function makeCall(request) {
     }
 }
 
-function sendMessageToUser(deviceId, message) {
+function sendMessageToUser(deviceId, message, title) {
+    
     request_http({
         url: 'https://fcm.googleapis.com/fcm/send',
         method: 'POST',
@@ -69,22 +70,32 @@ function sendMessageToUser(deviceId, message) {
         },
         body: JSON.stringify(
             {
-                'to': deviceId,
+                'registration_ids': deviceId,
                 'notification': {
-                    'title': 'Notification',
+                    'title': title,
                     'body': message
                 }
             }
         )
     }, function (error, response, body) {
-        console.log(response);
+        //console.log(response.body);
         if (error || (response.statusCode >= 400)) {
-            return 0;
-        }
-        else {
-            return 1;
+            console.log("FCM Error");
         }
     });
+}
+
+function createMessage(type, message_params) {
+    var message = "";
+    // Type 1 is when a user shares a new list 
+    // Type 2 is when a user adds an item to another list
+    if (type == 1) {
+        message = message_params["name"] + " has shared " + "'" + message_params["title"] + "'" + " with you.";
+    }
+    else {
+        message = message_params["editor"] + " has added " + message_params["item_name"] + " to " + message_params["list_name"];
+    }
+    return message;
 }
 
 connection.on('connect', function (err) {
@@ -392,6 +403,9 @@ app.post('/getlistcontents', function (req, res) {
 
 app.post('/additem', function (req, res) {
     var retVal = {};
+    var item;
+    var list_metadata = {};
+    var editor;
     var status_var;
     // Accepts list_id, email, item_name, location_name, latitude, longitude and secret
     if (req.body.list_id && req.body.item_name && req.body.secret && req.body.email) {
@@ -399,10 +413,17 @@ app.post('/additem', function (req, res) {
         if (req.body.secret == secret) {
             // Authorized for further operations
             var query;
-            var item_id;
+            var item = {
+                "item_name": req.body.item_name,
+                "location_name": req.body.location_name
+            };
             if (req.body.location_name && req.body.longitude && req.body.latitude) {
                 // Location stuff was specified
-                query = "INSERT INTO list_contents(list_id, email, item_name, location_name, longitude, latitude,done) OUTPUT Inserted.item_id VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name + "','" + req.body.location_name + "'," + req.body.longitude + "," + req.body.latitude + ",0);";
+                query = "INSERT INTO list_contents(list_id, email, item_name, location_name, longitude, latitude,done) OUTPUT Inserted.item_id VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name.replace("'", "''") + "','" + req.body.location_name.replace("'", "''") + "'," + req.body.longitude + "," + req.body.latitude + ",0); SELECT owner,title FROM lists WHERE list_id = " + req.body.list_id + "; SELECT name FROM users WHERE email = '" + req.body.email + "'";
+                console.log(query);
+                item["location_name"] = req.body.location_name;
+                item["logitude"] = req.body.longitude;
+                item["latitude"] = req.body.latitude;
             }
             else {
                 // Location stuff was not specified
@@ -416,16 +437,49 @@ app.post('/additem', function (req, res) {
                 }
                 else {
                     status_var = 200;
+                    if (list_metadata["owner"] != req.body.email) {
+                        var token = [];
+                        var query1 = "SELECT token FROM tokens WHERE email = '" + list_metadata["owner"] + "';"
+                        var request1 = new Request(query1, function (error, rowCount, rows) {
+                            if (err) {
+                                
+                            }
+                            else {
+                                var message_params = {
+                                    "editor": editor,
+                                    "item_name": item["item_name"],
+                                    "list_name": list_metadata["title"]
+                                }
+                                var message = createMessage(2, message_params);
+                                sendMessageToUser(token, message, "New item added");
+                                
+                            }
+                        });
+                        request1.on('row', function (columns) {
+                            columns.forEach(function (column) {
+                                token.push(column.value);
+                            });
+                        });
+                        connection.execSql(request1);
+                    }
                 }
                 retVal["status"] = status_var;
                 if (status_var = 200) {
-                    retVal["item_id"] = item_id;
+                    retVal["item_id"] = item["item_id"];
                 }
                 res.send(retVal);
             });
             request.on('row', function (columns) {
                 columns.forEach(function (column) {
-                    item_id = column.value;
+                    if (column.metadata.colName == "item_id") {
+                        item[column.metadata.colName] = column.value;
+                    }
+                    else if (column.metadata.colName == "name"){
+                        editor = column.value; 
+                    }
+                    else {
+                        list_metadata[column.metadata.colName] = column.value;
+                    }
                 });
             });
             makeCall(request);
@@ -682,7 +736,7 @@ app.post('/createlist', function (req, res) {
         if (req.body.secret == secret) {
             // Authorized for further operations, insert the user into the database
 
-            var query = "INSERT INTO lists (owner,title) OUTPUT Inserted.list_id VALUES('" + req.body.email + "','" + req.body.list_name + "');";
+            var query = "INSERT INTO lists (owner,title) OUTPUT Inserted.list_id VALUES('" + req.body.email + "','" + req.body.list_name.replace("'", "''") + "');";
 
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
@@ -1061,6 +1115,7 @@ app.post('/makepublic', function (req, res) {
     var retVal = {};
     var device_token_list = [];
     var notification = {};
+    var message_params = {};
     var status_var;
     var updated = 0;
     // Accepts the list_id and Secret
@@ -1087,7 +1142,8 @@ app.post('/makepublic', function (req, res) {
                         res.send(retVal);
                     }
                     else {
-                        var query1 = "SELECT name FROM users WHERE ; SELECT token FROM tokens WHERE email IN (SELECT dest_email FROM list_contents WHERE src_email = '" + notification[owner] + "');";
+                        var query1 = "SELECT name FROM users WHERE email = '" + notification["owner"] + "'; SELECT title FROM lists WHERE list_id = " + req.body.list_id + "; SELECT token FROM tokens WHERE email IN (SELECT dest_email FROM circles WHERE src_email = '" + notification["owner"] + "');";
+                        console.log(query1);
                         var request1 = new Request(query1, function (err, rowCount, rows) {
                             if (err) {
                                 status_var = 500;
@@ -1096,6 +1152,10 @@ app.post('/makepublic', function (req, res) {
                                 res.send(retVal);
                             }
                             else {
+
+
+                                var message = createMessage(1, message_params);
+                                sendMessageToUser(device_token_list, message, "New list added!");
                                 status_var = 200;
                                 retVal["status"] = 200;
                                 res.send(retVal);
@@ -1103,7 +1163,12 @@ app.post('/makepublic', function (req, res) {
                         });
                         request1.on('row', function (columns) {
                             columns.forEach(function (column) {
-                                device_token_list.push(column.value);
+                                if (column.metadata.colName == "name" || column.metadata.colName == "title") {
+                                    message_params[column.metadata.colName] = column.value;
+                                }
+                                else {
+                                    device_token_list.push(column.value);
+                                }
                             });
                         });
                         connection.execSql(request1);
@@ -1114,7 +1179,7 @@ app.post('/makepublic', function (req, res) {
             request.on('row', function (columns) {
                 updated++;
                 columns.forEach(function (column) {
-                    email_list.push(column.value);
+                    notification[column.metadata.colName] = column.value;
                 });
             });
             makeCall(request);
@@ -1210,8 +1275,7 @@ app.post('/tokenregistration', function (req, res) {
 
         if (req.body.secret == secret) {
             // Authorized for operations
-            var query = "IF EXISTS (SELECT * FROM Products WHERE id = ?) BEGIN (UPDATE tokens SET token = '" + req.body.token + "' WHERE email = '" + req.body.email + "') END ELSE BEGIN (INSERT INTO tokens(email,token) VALUES('" + req.body.email +  "','" + req.body.token + "')) END ";
-
+            var query = "IF EXISTS (SELECT * FROM tokens WHERE email = '" + req.body.email + "') BEGIN UPDATE tokens SET token = '" + req.body.token + "' WHERE email = '" + req.body.email + "' END ELSE BEGIN INSERT INTO tokens(email,token) VALUES('" + req.body.email +  "','" + req.body.token + "') END ";
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
                     status_var = 500;
