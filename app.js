@@ -85,6 +85,33 @@ function sendMessageToUser(deviceId, message, title) {
     });
 }
 
+function sendMessageToUserWithData(deviceId, message, data, title) {
+
+    request_http({
+        url: 'https://fcm.googleapis.com/fcm/send',
+        method: 'POST',
+        headers: {
+            'Content-Type': ' application/json',
+            'Authorization': 'key=AAAAHm4FIKY:APA91bEbVbP-2TZHr-uJ0d7x09cgI01IXv9EKyl3MjH_NCqtwtr2CR87Ra_7RqoJrPG7rZZy0OOi3_0gj8OHqM6oOpMit3cDKOb7a6CjxWpKUBYJywK8Q5v0pLhBMdQM3xf13UJl2Yzl'
+        },
+        body: JSON.stringify(
+            {
+                'registration_ids': deviceId,
+                'data': data,
+                'notification': {
+                    'title': title,
+                    'body': message
+                }
+            }
+        )
+    }, function (error, response, body) {
+        //console.log(response.body);
+        if (error || (response.statusCode >= 400)) {
+            console.log("FCM Error");
+        }
+    });
+}
+
 function createMessage(type, message_params) {
     var message = "";
     // Type 1 is when a user shares a new list 
@@ -467,7 +494,7 @@ app.post('/additem', function (req, res) {
                                     "list_name": list_metadata["title"]
                                 }
                                 var message = createMessage(2, message_params);
-                                sendMessageToUser(token, message, "New item added");
+                                sendMessageToUserWithData(token, message_params, item, "New item added");
                                 newNotification([list_metadata["owner"]], message);
                             }
                         });
