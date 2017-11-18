@@ -432,10 +432,10 @@ app.post('/additem', function (req, res) {
                 "item_name": req.body.item_name,
                 "list_id": req.body.list_id
             };
-            req.body.item_name = req.body.item_name..replace(/'/g, "''");
+            req.body.item_name = req.body.item_name.replace(/'/g, "''");
             if (req.body.location_name && req.body.longitude && req.body.latitude) {
                 // Location stuff was specified
-                req.body.location_name = req.body.location_name..replace(/'/g, "''");
+                req.body.location_name = req.body.location_name.replace(/'/g, "''");
                 query = "INSERT INTO list_contents(list_id, email, item_name, location_name, longitude, latitude,done) OUTPUT Inserted.item_id VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name + "','" + req.body.location_name + "'," + req.body.longitude + "," + req.body.latitude + ",0); SELECT owner,title FROM lists WHERE list_id = " + req.body.list_id + "; SELECT name FROM users WHERE email = '" + req.body.email + "';";
                 item["location_name"] = req.body.location_name;
                 item["logitude"] = req.body.longitude;
@@ -573,7 +573,7 @@ app.post('/createlist', function (req, res) {
     // Accepts the name of the list (title in DB) and email id of the owner (owner in DB) along with Secret
     if (req.body.list_name && req.body.email && req.body.secret) {
         // Parameters are fine
-        req.body.list_name = req.body.list_name..replace(/'/g, "''");
+        req.body.list_name = req.body.list_name.replace(/'/g, "''");
         if (req.body.secret == secret) {
             // Authorized for further operations, insert the user into the database
 
