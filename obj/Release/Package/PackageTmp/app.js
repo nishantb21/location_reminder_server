@@ -78,7 +78,7 @@ function sendMessageToUser(deviceId, message, title) {
             }
         )
     }, function (error, response, body) {
-        console.log(response.body);
+        //console.log(response.body);
         if (error || (response.statusCode >= 400)) {
             console.log("FCM Error");
         }
@@ -419,7 +419,8 @@ app.post('/additem', function (req, res) {
             };
             if (req.body.location_name && req.body.longitude && req.body.latitude) {
                 // Location stuff was specified
-                query = "INSERT INTO list_contents(list_id, email, item_name, location_name, longitude, latitude,done) OUTPUT Inserted.item_id VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name + "','" + req.body.location_name + "'," + req.body.longitude + "," + req.body.latitude + ",0); SELECT owner,title FROM lists WHERE list_id = " + req.body.list_id + "; SELECT name FROM users WHERE email = '" + req.body.email + "'";
+                query = "INSERT INTO list_contents(list_id, email, item_name, location_name, longitude, latitude,done) OUTPUT Inserted.item_id VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name.replace("'", "''") + "','" + req.body.location_name.replace("'", "''") + "'," + req.body.longitude + "," + req.body.latitude + ",0); SELECT owner,title FROM lists WHERE list_id = " + req.body.list_id + "; SELECT name FROM users WHERE email = '" + req.body.email + "'";
+                console.log(query);
                 item["location_name"] = req.body.location_name;
                 item["logitude"] = req.body.longitude;
                 item["latitude"] = req.body.latitude;
@@ -439,7 +440,7 @@ app.post('/additem', function (req, res) {
                     if (list_metadata["owner"] != req.body.email) {
                         var token = [];
                         var query1 = "SELECT token FROM tokens WHERE email = '" + list_metadata["owner"] + "';"
-                        var request1 = (query1, function (error, rowCount, rows) {
+                        var request1 = new Request(query1, function (error, rowCount, rows) {
                             if (err) {
                                 
                             }
@@ -464,7 +465,7 @@ app.post('/additem', function (req, res) {
                 }
                 retVal["status"] = status_var;
                 if (status_var = 200) {
-                    retVal["item_id"] = item_id;
+                    retVal["item_id"] = item["item_id"];
                 }
                 res.send(retVal);
             });
@@ -479,7 +480,6 @@ app.post('/additem', function (req, res) {
                     else {
                         list_metadata[column.metadata.colName] = column.value;
                     }
-                    item_id = column.value;
                 });
             });
             makeCall(request);
@@ -736,7 +736,7 @@ app.post('/createlist', function (req, res) {
         if (req.body.secret == secret) {
             // Authorized for further operations, insert the user into the database
 
-            var query = "INSERT INTO lists (owner,title) OUTPUT Inserted.list_id VALUES('" + req.body.email + "','" + req.body.list_name + "');";
+            var query = "INSERT INTO lists (owner,title) OUTPUT Inserted.list_id VALUES('" + req.body.email + "','" + req.body.list_name.replace("'", "''") + "');";
 
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
@@ -1143,6 +1143,7 @@ app.post('/makepublic', function (req, res) {
                     }
                     else {
                         var query1 = "SELECT name FROM users WHERE email = '" + notification["owner"] + "'; SELECT title FROM lists WHERE list_id = " + req.body.list_id + "; SELECT token FROM tokens WHERE email IN (SELECT dest_email FROM circles WHERE src_email = '" + notification["owner"] + "');";
+                        console.log(query1);
                         var request1 = new Request(query1, function (err, rowCount, rows) {
                             if (err) {
                                 status_var = 500;
@@ -1151,6 +1152,8 @@ app.post('/makepublic', function (req, res) {
                                 res.send(retVal);
                             }
                             else {
+
+
                                 var message = createMessage(1, message_params);
                                 sendMessageToUser(device_token_list, message, "New list added!");
                                 status_var = 200;

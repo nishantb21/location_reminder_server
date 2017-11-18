@@ -93,9 +93,24 @@ function createMessage(type, message_params) {
         message = message_params["name"] + " has shared " + "'" + message_params["title"] + "'" + " with you.";
     }
     else {
-        message = message_params["editor"] + " has added " + message_params["item_name"] + " to " + message_params["list_name"];
+        message = message_params["editor"] + " has added '" + message_params["item_name"] + "' to '" + message_params["list_name"] + "'.";
     }
     return message;
+}
+
+function newNotification(emails, message) {
+    var query = "";
+    message = message.replace(/'/g, "''");
+    //Generate Query
+    emails.forEach(function (email) {
+        query += "INSERT INTO notifications (email,message) VALUES('" + email + "','" + message + "');"
+    });
+    var request = new Request(query, function (err, rowCount, row) {
+        if (err) {
+            console.log(err)
+        }
+    });
+    makeCall(request);
 }
 
 connection.on('connect', function (err) {
@@ -415,19 +430,20 @@ app.post('/additem', function (req, res) {
             var query;
             var item = {
                 "item_name": req.body.item_name,
-                "location_name": req.body.location_name
+                "list_id": req.body.list_id
             };
+            req.body.item_name = req.body.item_name..replace(/'/g, "''");
             if (req.body.location_name && req.body.longitude && req.body.latitude) {
                 // Location stuff was specified
-                query = "INSERT INTO list_contents(list_id, email, item_name, location_name, longitude, latitude,done) OUTPUT Inserted.item_id VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name.replace("'", "''") + "','" + req.body.location_name.replace("'", "''") + "'," + req.body.longitude + "," + req.body.latitude + ",0); SELECT owner,title FROM lists WHERE list_id = " + req.body.list_id + "; SELECT name FROM users WHERE email = '" + req.body.email + "'";
-                console.log(query);
+                req.body.location_name = req.body.location_name..replace(/'/g, "''");
+                query = "INSERT INTO list_contents(list_id, email, item_name, location_name, longitude, latitude,done) OUTPUT Inserted.item_id VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name + "','" + req.body.location_name + "'," + req.body.longitude + "," + req.body.latitude + ",0); SELECT owner,title FROM lists WHERE list_id = " + req.body.list_id + "; SELECT name FROM users WHERE email = '" + req.body.email + "';";
                 item["location_name"] = req.body.location_name;
                 item["logitude"] = req.body.longitude;
                 item["latitude"] = req.body.latitude;
             }
             else {
                 // Location stuff was not specified
-                query = "INSERT INTO list_contents(list_id, email, item_name,done) OUTPUT Inserted.item_id VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name + "',0);";
+                query = "INSERT INTO list_contents(list_id, email, item_name,done) OUTPUT Inserted.item_id VALUES(" + req.body.list_id + ",'" + req.body.email + "','" + req.body.item_name + "',0); SELECT owner,title FROM lists WHERE list_id = " + req.body.list_id + "; SELECT name FROM users WHERE email = '" + req.body.email + "';";
             }
 
             var request = new Request(query, function (err, rowCount, rows) {
@@ -452,7 +468,7 @@ app.post('/additem', function (req, res) {
                                 }
                                 var message = createMessage(2, message_params);
                                 sendMessageToUser(token, message, "New item added");
-                                
+                                newNotification([list_metadata["owner"]], message);
                             }
                         });
                         request1.on('row', function (columns) {
@@ -550,181 +566,6 @@ app.post('/deleteitem', function (req, res) {
     }
 });
 
-{/*app.post('/markdone', function (req, res) {
-    var retVal = {};
-    var status_var;
-    // Accepts the item_id and list_id along with Secret
-    if (req.body.secret && req.body.list_id && req.body.item_id) {
-        // Parameters are fine
-
-        if (req.body.secret == secret) {
-            // Authorized for further operations
-
-            var query = "UPDATE list_contents SET done = '1' WHERE list_id = '" + req.body.list_id + "' and item_id = '" + req.body.item_id + "';"
-
-            var request = new Request(query, function (err, rowCount, rows) {
-                if (err) {
-                    status_var = 500;
-                    retVal["error"] = err.message;
-                }
-                else {
-                    status_var = 200;
-                }
-                retVal["status"] = status_var;
-                res.send(retVal);
-            });
-            makeCall(request);
-        }
-        else {
-            // Unauthorized access
-            retVal["error"] = "Unauthorized Access";
-            retVal["status"] = 405;
-            res.send(retVal);
-        }
-    }
-    else {
-        // Not enough parameters passed
-        retVal["status"] = 400;
-        retVal["error"] = "Not enough parameters passed";
-        res.send(retVal);
-    }
-});
-
-app.post('/share', function (req, res) {
-    var retVal = {};
-    var status_var;
-    var result_list = [];
-
-    //Accepts list_id, src_email, label along with the Secret
-    if (req.body.list_id && req.body.src_email && req.body.label && req.body.secret) {
-        //parameters are fine
-
-        if (req.body.secret == secret) {
-            //Authorized for further operations
-
-            var query = "SELECT dest_email from circles WHERE src_email = '" + req.body.src_email + "' and label = '" + req.body.label + "';";
-
-            var request = new Request(query, function (err, rowCount, rows) {
-                if (err) {
-                    status_var = 500;
-                    console.log(err);
-                }
-                else {
-                    status_var = 200;
-                    console.log("the list is " + result_list);
-                    var temoStr = "";
-                    for (var z = 0; z < result_list.length - 1; z++) {
-                        temoStr = temoStr + "('" + req.body.list_id + "','" + result_list[z] + "'), "
-                    }
-                    temoStr = temoStr + "('" + req.body.list_id + "','" + result_list[z] + "')";
-
-                    var query1 = "INSERT INTO lists_share(list_id, email) VALUES" + temoStr + ";";
-
-                    var request1 = new Request(query1, function (err, rowCount, rows) {
-                        if (err) {
-                            console.log(err);
-                        }
-                    });
-                    makeCall(request1);
-                }
-                retVal["status"] = status_var;
-                res.send(retVal);
-            });
-
-            request.on('row', function (columns) {
-
-                columns.forEach(function (column) {
-                    result_list.push(column.value);
-                });
-                //console.log(result_list);
-            });
-            connection.execSql(request);
-            console.log("hello");
-        }
-        else {
-            // Unauthorized access
-            retVal["error"] = "Unauthorized Access";
-            retVal["status"] = 405;
-            res.send(retVal);
-        }
-    }
-    else {
-        //insufficient parameters
-        status_var = 400;
-        retVal = {
-            status: status_var
-        }
-        res.send(retVal);
-    }
-});
-
-app.post('/unshare', function (req, res) {
-    var retVal = {};
-    var status_var;
-    var result_list = [];
-
-    // Accepst list_id, src_email, label along with Secret
-    if (req.body.list_id && req.body.src_email && req.body.label && req.body.secret) {
-        //Parameters are fine
-
-        if (req.body.secret == secret) {
-            //Authorized for further operations
-
-            var query = "SELECT dest_email from circles WHERE src_email = '" + req.body.src_email + "' and label = '" + req.body.label + "';";
-
-            var request = new Request(query, function (err, rowCount, rows) {
-                if (err) {
-                    status_var = 500;
-                    console.log(err);
-                }
-                else {
-                    status_var = 200;
-                    console.log("the list is " + result_list);
-                    var temoStr = "";
-                    for (var z = 0; z < result_list.length - 1; z++) {
-                        temoStr = temoStr + "email = '" + result_list[z] + "' or  "
-                    }
-                    temoStr = temoStr + "email = '" + result_list[z] + "';";
-
-                    var query1 = "delete from lists_share where " + temoStr + ";";
-
-                    var request1 = new Request(query1, function (err, rowCount, rows) {
-                        if (err) {
-                            console.log(err);
-                        }
-                    });
-                    makeCall(request1);
-                }
-                retVal["status"] = status_var;
-                res.send(retVal);
-            });
-
-            request.on('row', function (columns) {
-
-                columns.forEach(function (column) {
-                    result_list.push(column.value);
-                });
-                //console.log(result_list);
-            });
-            connection.execSql(request);
-            console.log("hello");
-        }
-        else {
-            // Unauthorized access
-            retVal["error"] = "Unauthorized Access";
-            retVal["status"] = 405;
-            res.send(retVal);
-        }
-    }
-    else {
-        status_var = 400;
-        retVal = {
-            status: status_var
-        }
-        res.send(retVal);
-    }
-});*/}
-
 app.post('/createlist', function (req, res) {
     var retVal = {};
     var status_var;
@@ -732,11 +573,11 @@ app.post('/createlist', function (req, res) {
     // Accepts the name of the list (title in DB) and email id of the owner (owner in DB) along with Secret
     if (req.body.list_name && req.body.email && req.body.secret) {
         // Parameters are fine
-
+        req.body.list_name = req.body.list_name..replace(/'/g, "''");
         if (req.body.secret == secret) {
             // Authorized for further operations, insert the user into the database
 
-            var query = "INSERT INTO lists (owner,title) OUTPUT Inserted.list_id VALUES('" + req.body.email + "','" + req.body.list_name.replace("'", "''") + "');";
+            var query = "INSERT INTO lists (owner,title) OUTPUT Inserted.list_id VALUES('" + req.body.email + "','" + req.body.list_name + "');";
 
             var request = new Request(query, function (err, rowCount, rows) {
                 if (err) {
@@ -1114,6 +955,7 @@ app.post('/viewpeerlists', function (req, res) {
 app.post('/makepublic', function (req, res) {
     var retVal = {};
     var device_token_list = [];
+    var email_list = [];
     var notification = {};
     var message_params = {};
     var status_var;
@@ -1142,8 +984,7 @@ app.post('/makepublic', function (req, res) {
                         res.send(retVal);
                     }
                     else {
-                        var query1 = "SELECT name FROM users WHERE email = '" + notification["owner"] + "'; SELECT title FROM lists WHERE list_id = " + req.body.list_id + "; SELECT token FROM tokens WHERE email IN (SELECT dest_email FROM circles WHERE src_email = '" + notification["owner"] + "');";
-                        console.log(query1);
+                        var query1 = "SELECT name FROM users WHERE email = '" + notification["owner"] + "'; SELECT title FROM lists WHERE list_id = " + req.body.list_id + "; SELECT token,email FROM tokens WHERE email IN (SELECT dest_email FROM circles WHERE src_email = '" + notification["owner"] + "');";
                         var request1 = new Request(query1, function (err, rowCount, rows) {
                             if (err) {
                                 status_var = 500;
@@ -1152,10 +993,9 @@ app.post('/makepublic', function (req, res) {
                                 res.send(retVal);
                             }
                             else {
-
-
                                 var message = createMessage(1, message_params);
                                 sendMessageToUser(device_token_list, message, "New list added!");
+                                newNotification(email_list, message);
                                 status_var = 200;
                                 retVal["status"] = 200;
                                 res.send(retVal);
@@ -1166,8 +1006,11 @@ app.post('/makepublic', function (req, res) {
                                 if (column.metadata.colName == "name" || column.metadata.colName == "title") {
                                     message_params[column.metadata.colName] = column.value;
                                 }
-                                else {
+                                else if (column.metadata.colName == "token") {
                                     device_token_list.push(column.value);
+                                }
+                                else {
+                                    email_list.push(column.value);
                                 }
                             });
                         });
@@ -1229,14 +1072,6 @@ app.post('/makeprivate', function (req, res) {
                         res.send(retVal);
                     }
                     else {
-                        /*var query1 = "";
-                        var request1 = new Request(query1, function (err, rowCount, rows) {
-                        });
-                        request1.on('row', function (columns) {
-                            columns.forEach(function (column) {
-                                device_token_list.push(email)
-                            });
-                        });*/
                         retVal["status"] = 200;
                         res.send(retVal);
                     }
@@ -1305,23 +1140,48 @@ app.post('/tokenregistration', function (req, res) {
 });
 
 app.post('/getnotifications', function (req, res) {
-    // TODO
-    var query = "SELECT * FROM users;SELECT * from lists;"
-    var request = new Request(query, function (error, rowCount, rows) {
-        if (error) {
-            console.log(error);
+    //Accepts email and secret
+    var retVal = {};
+    var messages = [];
+    var status_var;
+    if (req.body.email && req.body.secret) {
+        // Parameters are fine
+        if (req.body.secret == secret) {
+            // Authorized for operations
+            var query = "SELECT TOP 10 message FROM notifications WHERE email = '" + req.body.email + "' ORDER BY (notification_id) DESC;";
+            var request = new Request(query, function (err, rowCount, rows) {
+                if (err) {
+                    status_var = 500;
+                    retVal["error"] = err.message;
+                }
+                else {
+                    status_var = 200;
+                    retVal["messages"] = messages;
+                }
+                retVal["status"] = status_var;
+                res.send(retVal);
+            });
+
+            request.on('row', function (columns) {
+                columns.forEach(function (column) {
+                    messages.push(column.value);
+                });
+            });
+            makeCall(request);
         }
         else {
-            console.log("success");
+            // Unauthorized access
+            retVal["error"] = "Unauthorized Access";
+            retVal["status"] = 405;
+            res.send(retVal);
         }
-    });
-    request.on("row", function (columns) {
-        columns.forEach(function (column) {
-            console.log(column.metadata.colName + ":" + column.value);
-        });
-    });
-    res.send("Done");
-    connection.execSql(request);
+    }
+    else {
+        // Not enough parameters passed
+        retVal["status"] = 400;
+        retVal["error"] = "Not enough parameters passed";
+        res.send(retVal);
+    }
 });
 
 app.set('port', process.env.PORT || 3000);
